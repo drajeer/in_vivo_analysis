@@ -1,0 +1,164 @@
+# Breasts too fatty to measure
+
+```{python}
+#| include: false
+from cohort_common import *
+```
+
+The rule of @sec-the-rule compares a patient only if both breasts have a usable scan. A breast with no usable scan is not
+mismeasured; it is left out because every spot the beam hit was fat. Many of these breasts are genuinely NORMAL, and being too fatty to measure
+is itself a result: that breast has little water. This section looks at those breasts, and at what happens if the test counts them as the
+fattier breast instead of leaving the patient out.
+
+```{python}
+#| include: false
+# each breast: its labels, usable scans and all scans
+breast_info = defaultdict(lambda: [set(), 0, 0])
+breast_scans = defaultdict(list)  # (nova, side): [(curve, usable)]
+for nova, side, label, curve, height, centre in scan_records:
+    keep = usable(height, centre, WATER_MIN, CENTRE_MIN)
+    info = breast_info[nova, side]
+    info[0].add(label); info[1] += keep; info[2] += 1
+    breast_scans[nova, side].append((curve, keep))
+
+def label_of(nova, side):
+    info = breast_info.get((nova, side))
+    return next(iter(info[0])) if info and len(info[0]) == 1 else None
+
+def pair_name(nova):
+    """'CANCER vs NORMAL' etc. (first-named breast expected to have more water), 'NORMAL vs NORMAL', or None."""
+    labels = sorted((label_of(nova, "LEFT"), label_of(nova, "RIGHT")), key=str)
+    if None in labels:
+        return None
+    if labels == ["NORMAL", "NORMAL"]:
+        return "NORMAL vs NORMAL"
+    for comparison, (base, others) in COMPARISONS.items():
+        if base in labels and set(labels) - {base} <= set(others) and labels.count(base) == 1:
+            return comparison
+    return None
+
+PAIR_NAMES = list(COMPARISONS) + ["NORMAL vs NORMAL"]
+pair_of = {nova: pair_name(nova) for nova in analysis_novas}
+
+# how many of each label's breasts have no usable scan
+no_usable = {label: [breast_info[k][1] == 0 for k in breast_info if label_of(*k) == label] for label in COHORTS}
+no_usable_table = "\n".join(["| Label | Breasts | No usable scan |", "|---|---|---|"]
+                            + [f"| {label} | {len(flags)} | {sum(flags)} ({np.mean(flags):.0%}) |" for label, flags in no_usable.items()])
+
+# each kind of patient: both breasts usable, one, or neither
+def usable_sides(nova):
+    return sum(breast_info[nova, side][1] > 0 for side in ("LEFT", "RIGHT"))
+
+patients_table_rows = []
+for name in PAIR_NAMES:
+    novas = [n for n, p in pair_of.items() if p == name]
+    counts = [sum(usable_sides(n) == k for n in novas) for k in (2, 1, 0)]
+    patients_table_rows.append(f"| {name} | {len(novas)} | {counts[0]} | {counts[1]} | {counts[2]} ({counts[2] / len(novas):.0%}) |")
+patients_table = "\n".join(["| Patients | All | Both breasts usable | One | Neither |", "|---|---|---|---|---|"] + patients_table_rows)
+
+# the test with a breast that has no usable scan counted as the fattier one
+use = rule_breasts(WATER_MIN, CENTRE_MIN)
+
+def with_fatty(comparison):
+    base, others = COMPARISONS[comparison]
+    higher = compared = 0
+    for nova, name in pair_of.items():
+        if name != comparison:
+            continue
+        values = {}
+        for side in ("LEFT", "RIGHT"):
+            value = use[nova, side][1] if (nova, side) in use else -np.inf  # no usable scan: fattiest possible
+            values[label_of(nova, side)] = value
+        first, second = values[next(label for label in values if label != base)], values[base]
+        if first == second or np.isnan(first) or np.isnan(second):
+            continue  # both too fatty to measure: nothing to tell them apart
+        compared += 1; higher += first > second
+    return higher, compared, binomtest(higher, compared).pvalue if compared else np.nan
+
+fixed = rule_results(WATER_MIN, CENTRE_MIN)
+fatty = {c: with_fatty(c) for c in COMPARISONS}
+result_table = "\n".join(["| Comparison | Both breasts usable | Counting a breast with no usable scan as the fattier |", "|---|---|---|"]
+                         + [f"| {c} | {rule_text(fixed, c)}, p = {fixed[c][2]:.3f} | {rule_text(fatty, c)}, p = {fatty[c][2]:.3f} |"
+                            for c in COMPARISONS])
+
+nn_neither = [n for n, p in pair_of.items() if p == "NORMAL vs NORMAL" and usable_sides(n) == 0]
+```
+
+## Who has no usable scan
+
+Breasts with no usable scan, by label:
+
+```{python}
+#| echo: false
+#| output: asis
+print(no_usable_table)
+```
+
+And patients by how many of their breasts have a usable scan:
+
+```{python}
+#| echo: false
+#| output: asis
+print(patients_table)
+```
+
+Of the `{python} sum(p == "NORMAL vs NORMAL" for p in pair_of.values())` patients with two NORMAL breasts,
+`{python} len(nn_neither)` have no usable scan in either breast, so the rule never sees them (@fig-nn-fatty). These are the most typical healthy
+patients in the study, and their breasts are fatty all the way through.
+
+```{python}
+#| label: fig-nn-fatty
+#| fig-cap: "The NORMAL/NORMAL patients in which neither breast has a usable scan. Each panel is one patient: every prepared scan of the left (blue) and right (orange) breast, with the usable-scan water threshold over q 20–22 (black bar). The water peak never reaches the threshold."
+SIDE_COLOURS = {"LEFT": "tab:blue", "RIGHT": "tab:orange"}
+curves = [curve for n in nn_neither for side in ("LEFT", "RIGHT") for curve, _ in breast_scans[n, side]]
+covered = np.flatnonzero(np.isfinite(np.vstack(curves)).all(axis=0))
+columns = slice(covered[0], covered[-1] + 1)
+y_top = 1.05 * np.nanmax(np.vstack(curves)[:, columns])
+
+plt.rcParams["font.size"] = 7
+n_cols = 4
+n_rows = int(np.ceil(len(nn_neither) / n_cols))
+fig, axes = plt.subplots(n_rows, n_cols, figsize=(8, 2.1 * n_rows), sharex=True, sharey=True, squeeze=False)
+for ax, nova in zip(axes.flat, nn_neither):
+    for side, colour in SIDE_COLOURS.items():
+        for curve, _ in breast_scans[nova, side]:
+            ax.plot(q[columns], curve[columns], color=colour, lw=0.9, alpha=0.8)
+    ax.hlines(WATER_MIN, *WATER, color="black", lw=2)
+    age = f", age {nova_age[nova]:.0f}" if nova in nova_age else ""
+    ax.set_title(f"Nova {nova}{age}")
+    ax.set(xlim=(2, q[columns][-1]), ylim=(0, y_top))
+    ax.grid(alpha=0.3)
+for ax in axes.flat[len(nn_neither):]:
+    ax.axis("off")
+for ax in axes[-1]:
+    ax.set_xlabel("q (nm⁻¹)")
+for ax in axes[:, 0]:
+    ax.set_ylabel("I(q), stretched")
+axes[0, 0].legend(handles=[Line2D([], [], color=c, label=s.lower()) for s, c in SIDE_COLOURS.items()], frameon=False, loc="upper right")
+fig.tight_layout()
+plt.show()
+plt.rcParams["font.size"] = 10
+```
+
+## Counting a fatty breast as a result
+
+If a breast has no usable scan, the test can treat it as the fattier breast of the pair instead of dropping the patient. A patient whose
+two breasts both have no usable scan is still left out: there is nothing to tell them apart.
+
+```{python}
+#| echo: false
+#| output: asis
+print(result_table)
+```
+
+For CANCER vs NORMAL this adds the patients where only the CANCER breast has a usable scan, which count as right, and those where only the
+NORMAL breast has one, which count as wrong. The first kind outnumber the second, so more patients are compared with about the same strength
+of evidence. For BENIGN vs NORMAL it goes the other way: more often it is the BENIGN breast that has no usable scan, and the result falls
+further below chance. Most of the patients the rule drops are not lost wins, as in most of them both breasts are fatty.
+
+Having two fatty breasts is much more common in NORMAL/NORMAL patients (`{python} f"{len(nn_neither) / sum(p == 'NORMAL vs NORMAL' for p in pair_of.values()):.0%}"`)
+than in any other kind of patient (37–42%). So "too fatty to measure in both breasts" leans towards a healthy patient. NORMAL/NORMAL patients
+are older, though (median age `{python} f"{np.median([nova_age[n] for n, p in pair_of.items() if p == 'NORMAL vs NORMAL' and n in nova_age]):.0f}"`
+against `{python} f"{np.median([nova_age[n] for n, p in pair_of.items() if p and p != 'NORMAL vs NORMAL' and n in nova_age]):.0f}"` for the
+other patients), and fatty breasts are common with age, so this may be age as much as health. With only
+`{python} sum(p == "NORMAL vs NORMAL" for p in pair_of.values())` NORMAL/NORMAL patients it is a hint, not a result.

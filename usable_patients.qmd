@@ -1,0 +1,224 @@
+# Patients under the water-peak rule {#sec-usable-patients}
+
+```{python}
+#| include: false
+from cohort_common import *
+
+found = rule_breasts(WATER_MIN, CENTRE_MIN)
+both = sorted({n for n, _ in found if (n, "LEFT") in found and (n, "RIGHT") in found})
+
+# every scan of every usable patient, for the panel plots
+usable_records = defaultdict(list)  # (nova, side): [(label, curve, height, centre, usable)]
+for nova, side, label, curve, height, centre in scan_records:
+    if nova in both:
+        usable_records[nova, side].append((label, curve, height, centre, usable(height, centre, WATER_MIN, CENTRE_MIN)))
+
+def pair_name(nova):
+    """'CANCER vs NORMAL' etc., or 'NORMAL vs NORMAL', or 'other'."""
+    labels = sorted(found[nova, side][0] for side in ("LEFT", "RIGHT"))
+    if labels == ["NORMAL", "NORMAL"]:
+        return "NORMAL vs NORMAL"
+    for comparison, (base, others) in COMPARISONS.items():
+        if labels.count(base) == 1 and set(labels) - {base} <= set(others):
+            return comparison
+    return "other"
+
+GROUPS = list(COMPARISONS) + ["NORMAL vs NORMAL", "other"]
+group_novas = {name: [n for n in both if pair_name(n) == name] for name in GROUPS}
+# drop empty groups from the body
+GROUPS = [name for name in GROUPS if group_novas[name]]
+
+def plot_group(novas, label):
+    """One panel per patient, same layout as @fig-new-patients, no outcome tinting."""
+    if not novas:
+        return
+    columns = 8
+    rows_needed = int(np.ceil(len(novas) / columns))
+    plt.rcParams["font.size"] = 6
+    fig, axes = plt.subplots(rows_needed, columns, figsize=(10, 1.45 * rows_needed + 0.3),
+                             sharex=True, sharey=True, squeeze=False)
+    for ax, nova in zip(axes.flat, novas):
+        counts = []
+        for side, colour in (("LEFT", "tab:blue"), ("RIGHT", "tab:orange")):
+            records = usable_records.get((nova, side), [])
+            n_good = sum(ok for *_, ok in records)
+            counts.append(f"{side[0]} {n_good}/{len(records)}")
+            for _, curve, _, _, ok in records:
+                ax.plot(q, curve, color=colour if ok else "grey", lw=0.8 if ok else 0.6, ls="-" if ok else "--")
+        ax.hlines(WATER_MIN, *WATER, color="black", lw=2, zorder=5)
+        labs = [found[nova, s][0] for s in ("LEFT", "RIGHT")]
+        ratios = [found[nova, s][1] for s in ("LEFT", "RIGHT")]
+        ax.set_title(f"Nova {nova}: {' / '.join(labs)}\n{', '.join(counts)}; Water:Fat {ratios[0]:.2f}, {ratios[1]:.2f}",
+                     fontsize=5.5)
+        ax.set(xlim=(2, 25), ylim=(-0.1, 1.8))
+    for ax in axes.flat[len(novas):]:
+        ax.axis("off")
+    for ax in axes[-1]:
+        ax.set_xlabel("q (nm⁻¹)")
+    fig.tight_layout(pad=0.4)
+    plt.show()
+    plt.rcParams["font.size"] = 10
+
+def group_table(novas):
+    """Markdown table: patient, labels, usable scans, Water:Fat. No colour coding."""
+    lines = ["| Patient | Labels (L / R) | Usable scans, L | Usable scans, R | Water:Fat, L | Water:Fat, R |",
+             "|---|---|---|---|---|---|"]
+    for nova in novas:
+        left, right = found[nova, "LEFT"], found[nova, "RIGHT"]
+        labels = left[0] if left[0] == right[0] else f"{left[0]} / {right[0]}"
+        lines.append(f"| Nova {nova} | {labels} | {left[2]} of {left[3]} | {right[2]} of {right[3]} | "
+                     f"{left[1]:.2f} | {right[1]:.2f} |")
+    return "\n".join(lines)
+
+# NORMAL/NORMAL with neither breast usable (every scan rejected)
+breast_info = defaultdict(lambda: [set(), 0, 0])  # labels, usable count, all count
+for nova, side, label, curve, height, centre in scan_records:
+    info = breast_info[nova, side]
+    info[0].add(label); info[1] += usable(height, centre, WATER_MIN, CENTRE_MIN); info[2] += 1
+nn_missed = []
+for nova in analysis_novas:
+    sides = [breast_info.get((nova, side)) for side in ("LEFT", "RIGHT")]
+    if any(s is None or len(s[0]) != 1 for s in sides):
+        continue
+    if [next(iter(s[0])) for s in sides] == ["NORMAL", "NORMAL"] and sides[0][1] == 0 and sides[1][1] == 0:
+        nn_missed.append(nova)
+
+def plot_missed(novas):
+    columns = 8
+    rows_needed = int(np.ceil(len(novas) / columns))
+    plt.rcParams["font.size"] = 6
+    fig, axes = plt.subplots(rows_needed, columns, figsize=(10, 1.45 * rows_needed + 0.3),
+                             sharex=True, sharey=True, squeeze=False)
+    for ax, nova in zip(axes.flat, novas):
+        counts = []
+        for side, colour in (("LEFT", "tab:blue"), ("RIGHT", "tab:orange")):
+            records = [(curve,) for n, s, label, curve, height, centre in scan_records if n == nova and s == side]
+            counts.append(f"{side[0]} 0/{len(records)}")
+            for (curve,) in records:
+                ax.plot(q, curve, color=colour, lw=0.7, ls="--", alpha=0.85)
+        ax.hlines(WATER_MIN, *WATER, color="black", lw=2, zorder=5)
+        ax.set_title(f"Nova {nova}: NORMAL / NORMAL\n{', '.join(counts)}; no usable scan", fontsize=5.5)
+        ax.set(xlim=(2, 25), ylim=(-0.1, 1.8))
+    for ax in axes.flat[len(novas):]:
+        ax.axis("off")
+    for ax in axes[-1]:
+        ax.set_xlabel("q (nm⁻¹)")
+    fig.tight_layout(pad=0.4)
+    plt.show()
+    plt.rcParams["font.size"] = 10
+
+def missed_table(novas):
+    lines = ["| Patient | Labels (L / R) | Usable scans, L | Usable scans, R |",
+             "|---|---|---|---|"]
+    for nova in novas:
+        left, right = breast_info[nova, "LEFT"], breast_info[nova, "RIGHT"]
+        lines.append(f"| Nova {nova} | NORMAL / NORMAL | {left[1]} of {left[2]} | {right[1]} of {right[2]} |")
+    return "\n".join(lines)
+```
+
+Chapter 1 (@sec-water-rich) is the **top/bottom `{python} PART`%** cut on samples. This appendix is different: it applies the **fixed water-peak
+rule** of @sec-the-rule (threshold `{python} f"{WATER_MIN:g}"`) scan by scan, and shows every patient in the analysis set with **both breasts
+usable** under that rule.
+
+Plotted the same way as the newest patients (@sec-new-patients): one panel per patient, usable scans coloured (left blue, right orange), rejected
+scans grey and dashed, black bar the water-peak threshold. No outcome tinting — every patient in the usable groups already has both breasts
+usable. Grouped by the label pair used in the paired comparisons (`{python} len(both)` patients), plus the NORMAL/NORMAL patients that missed the
+threshold entirely.
+
+## CANCER vs NORMAL
+
+`{python} len(group_novas["CANCER vs NORMAL"])` patients: the paired comparison under the rule of @sec-the-rule.
+
+```{python}
+#| label: fig-usable-cancer-normal
+#| fig-cap: "CANCER vs NORMAL patients with both breasts usable. Usable scans coloured (left blue, right orange), rejected scans grey dashed; black bar is the water-peak threshold."
+plot_group(group_novas["CANCER vs NORMAL"], "CANCER vs NORMAL")
+```
+
+```{python}
+#| echo: false
+#| output: asis
+print(group_table(group_novas["CANCER vs NORMAL"]))
+```
+
+## BENIGN vs NORMAL
+
+`{python} len(group_novas["BENIGN vs NORMAL"])` patients.
+
+```{python}
+#| label: fig-usable-benign-normal
+#| fig-cap: "BENIGN vs NORMAL patients with both breasts usable. Same layout as @fig-usable-cancer-normal."
+plot_group(group_novas["BENIGN vs NORMAL"], "BENIGN vs NORMAL")
+```
+
+```{python}
+#| echo: false
+#| output: asis
+print(group_table(group_novas["BENIGN vs NORMAL"]))
+```
+
+## CANCER vs BENIGN
+
+`{python} len(group_novas["CANCER vs BENIGN"])` patients.
+
+```{python}
+#| label: fig-usable-cancer-benign
+#| fig-cap: "CANCER vs BENIGN patients with both breasts usable. Same layout as @fig-usable-cancer-normal."
+plot_group(group_novas["CANCER vs BENIGN"], "CANCER vs BENIGN")
+```
+
+```{python}
+#| echo: false
+#| output: asis
+print(group_table(group_novas["CANCER vs BENIGN"]))
+```
+
+## NORMAL vs NORMAL
+
+`{python} len(group_novas["NORMAL vs NORMAL"])` patients: the healthy baseline.
+
+```{python}
+#| label: fig-usable-normal-normal
+#| fig-cap: "NORMAL vs NORMAL patients with both breasts usable. Same layout as @fig-usable-cancer-normal."
+plot_group(group_novas["NORMAL vs NORMAL"], "NORMAL vs NORMAL")
+```
+
+```{python}
+#| echo: false
+#| output: asis
+print(group_table(group_novas["NORMAL vs NORMAL"]))
+```
+
+## NORMAL vs NORMAL that missed the threshold
+
+Patients with two NORMAL breasts and **no usable scan in either breast**: every scan sits below the water-peak threshold. Same panel layout; all
+scans are rejected, so they are shown dashed. `{python} len(nn_missed)` patients.
+
+```{python}
+#| label: fig-missed-normal-normal
+#| fig-cap: "NORMAL vs NORMAL patients with no usable scan in either breast. Every scan is below the water-peak threshold (black bar); left breast blue dashed, right orange dashed."
+plot_missed(nn_missed)
+```
+
+```{python}
+#| echo: false
+#| output: asis
+print(missed_table(nn_missed))
+```
+
+## Other usable pairs
+
+`{python} len(group_novas["other"])` patients with both breasts usable whose labels are not one of the pairs above (for example BENIGN/BENIGN, or a
+side labelled ATYPICAL or PRE_CANCEROUS).
+
+```{python}
+#| label: fig-usable-other
+#| fig-cap: "Other patients with both breasts usable. Same layout as @fig-usable-cancer-normal."
+plot_group(group_novas["other"], "other")
+```
+
+```{python}
+#| echo: false
+#| output: asis
+print(group_table(group_novas["other"]))
+```

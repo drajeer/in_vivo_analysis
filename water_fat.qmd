@@ -1,0 +1,61 @@
+# Measuring Water:Fat: fitting two Gaussians {#sec-water-fat}
+
+```{python}
+#| include: false
+from cohort_common import *
+```
+
+To compare the two breasts of a patient, each breast gets one number, its **Water:Fat**. All of the breast's scans are peak-shift corrected and
+min-max normalised (@sec-preparation), then averaged. A sum of two Gaussians is fitted to that mean curve over q = 7-25 nm⁻¹: one for the fat peak
+(centre between q = 12 and 16) and one for the broader water peak (centre between q = 17 and 26). The area of each Gaussian within ±3σ of its centre is
+height × σ × √(2π) × erf(3/√2), and the breast's Water:Fat is the water Gaussian's area divided by the fat Gaussian's area. A breast with more water
+and less fat has a larger Water:Fat, and comparing the two breasts of one patient removes much of what differs from patient to patient.
+
+@fig-water-fat shows this for one patient with one NORMAL and one CANCER breast, each breast the mean of all its scans. Under the water-peak rule the mean is of the breast's usable scans only (@sec-the-rule).
+
+```{python}
+#| label: fig-water-fat
+#| fig-cap: "How Water:Fat is measured, for one CANCER/NORMAL patient. Each panel is one breast: the mean of its scans after preparation (black), the fitted fat Gaussian (yellow) and water Gaussian (blue), each shaded within ±3σ of its centre, and their sum (red dashed). Water:Fat is the blue area over the yellow area."
+# FIT_RANGE, the Gaussian fit, water_fat and breast_curves come from cohort_common
+# the highest-ranked patient in the top 10% of fig-cohort (right) with one NORMAL and one CANCER breast, both fitted
+example = None
+for name in [names[k] for k in by_water[:round(len(names) * 0.1)]]:
+    breasts_here = breast_curves(ne.row_nova(name))
+    if (sorted(label for label, _, _ in breasts_here.values()) == ["CANCER", "NORMAL"]
+            and all(fit_two_gaussians(curve) is not None for _, curve, _ in breasts_here.values())):
+        example, example_breasts = ne.row_nova(name), breasts_here
+        break
+
+plt.rcParams["font.size"] = 7  # small text so both panels fit side by side on an A4 page
+fig, axes = plt.subplots(1, 2, figsize=(8, 4), sharey=True)
+example_ratio = {}
+for ax, (side, (label, curve, count)) in zip(axes, example_breasts.items()):
+    ax.set_box_aspect(1)  # square panels
+    p = fit_two_gaussians(curve)
+    fat, water = p[:3], p[3:]
+    example_ratio[label] = area_3sigma(*water) / area_3sigma(*fat)
+    x = np.linspace(2, 25, 600)
+    for (height, centre, sigma), colour, name in ((fat, FAT_COLOUR, "fat"), (water, WATER_COLOUR, "water")):
+        within = (x >= centre - 3 * sigma) & (x <= centre + 3 * sigma)
+        ax.fill_between(x[within], gaussian(x[within], height, centre, sigma), color=colour, alpha=0.3, lw=0)
+        ax.plot(x, gaussian(x, height, centre, sigma), color=colour, lw=1.5,
+                label=f"{name} Gaussian: centre {centre:.1f}, σ {sigma:.2f}, area {area_3sigma(height, centre, sigma):.2f}")
+    ax.plot(q, curve, color="black", lw=1, label=f"mean of {count} scans")
+    ax.plot(x, two_gaussians(x, *p), color="red", ls="--", lw=1.5, zorder=5, label="fat + water fit")
+    ax.axvspan(2, FIT_RANGE[0], color="grey", alpha=0.08)  # left out of the fit
+    ax.set(title=f"Nova {example} {side} breast: {label}\nWater:Fat = {area_3sigma(*water):.2f} / {area_3sigma(*fat):.2f} = {example_ratio[label]:.2f}",
+           xlabel="q (nm⁻¹)", xlim=(2, 25))
+    ax.set_xticks([5, 10, 15, 20, 25])
+    ax.grid(alpha=0.3)
+    ax.legend(frameon=False, loc="upper left", fontsize=6)
+axes[0].set_ylabel("I(q), stretched")
+in_fit = (q >= FIT_RANGE[0]) & (q <= FIT_RANGE[1])
+axes[0].set_ylim(0, 1.35 * max(np.nanmax(curve[in_fit]) for _, curve, _ in example_breasts.values()))  # room for the legend above the data
+fig.tight_layout()
+plt.show()
+plt.rcParams["font.size"] = 10
+```
+
+For Nova `{python} example`, the CANCER breast's Water:Fat is `{python} f"{example_ratio['CANCER']:.2f}"` and the NORMAL breast's is
+`{python} f"{example_ratio['NORMAL']:.2f}"`: the CANCER breast has the higher Water:Fat, by a factor of
+`{python} f"{example_ratio['CANCER'] / example_ratio['NORMAL']:.1f}"`. 

@@ -1,0 +1,172 @@
+# The water-peak rule {#sec-the-rule}
+
+```{python}
+#| include: false
+from cohort_common import *
+```
+
+The filter that decides whether a scan is usable (water-rich). To be a fair test it must meet three conditions:
+
+1. **Blind.** It uses only the scan itself, never the breast's label or the result of the comparison.
+2. **Symmetric.** It is applied the same way to both breasts, so neither is favoured.
+3. **The same on every patient.** The threshold is not tuned patient by patient. It was, however, chosen by looking at the sensitivity curve on
+   this same set of patients (@fig-on-the-fly), so the headline result is not independent of that choice.
+
+Each breast is scanned a few times, usually three, and some of those scans will miss the glandular tissue. So the rule works scan by scan:
+
+- **A scan is usable** if it has a real water peak: its water peak height (the mean of its prepared curve over q = 20-22) is at least
+  **`{python} f"{WATER_MIN:g}"`**, that is `{python} f"{100 * WATER_MIN:.0f}"`% of the fat peak's height, and its fitted water Gaussian is centred at
+  **q ≥ `{python} f"{CENTRE_MIN:g}"`**, so the fit has found a water peak and not just the shoulder of the fat peak.
+- **A breast is usable** if at least one of its scans is; its Water:Fat comes from the mean of its usable scans only.
+- **A patient is compared** only if **both** breasts are usable.
+
+```{python}
+#| label: fig-on-the-fly-example
+#| fig-cap: "The rule on three breasts. **Left and middle**: one CANCER/NORMAL patient, each breast with usable scans (coloured) and rejected scans (grey dashed); fat (yellow) and water (blue) Gaussians fitted to the mean of the usable scans, with their sum (red dashed). **Right**: a breast with no usable scan — every scan sits below the threshold (black bar over q 20-22), so the breast is not used."
+found = rule_breasts(WATER_MIN, CENTRE_MIN)
+# usable example: the first CANCER/NORMAL patient with both usable and rejected scans in each breast
+example_nova = next(n for n in analysis_novas
+                    if (n, "LEFT") in found and (n, "RIGHT") in found
+                    and sorted(found[n, s][0] for s in ("LEFT", "RIGHT")) == ["CANCER", "NORMAL"]
+                    and all(0 < found[n, s][2] < found[n, s][3] for s in ("LEFT", "RIGHT")))
+# not-usable example: a breast with scans but none that pass the rule
+rejected_example = next((nova, side, label)
+                        for nova, side, label, curve, height, centre in scan_records
+                        if label in COHORTS and (nova, side) not in found
+                        and sum(1 for n, s, *_ in scan_records if n == nova and s == side) >= 2)
+
+def plot_breast(ax, nova, side, show_fit):
+    records = [(label, curve, height, centre, usable(height, centre, WATER_MIN, CENTRE_MIN))
+               for n, s, label, curve, height, centre in scan_records if n == nova and s == side]
+    label = records[0][0]
+    good = []
+    for k, (_, curve, height, centre, ok) in enumerate(records):
+        tag = f"scan {k + 1}: water {height:.2f}, centre {centre:.1f}"
+        if ok:
+            good.append(curve)
+            ax.plot(q, curve, color=ne.STATUS_COLOURS[label], lw=0.9, label=f"{tag}, usable")
+        else:
+            ax.plot(q, curve, color="grey", lw=0.8, ls="--", label=f"{tag}, rejected")
+    ax.hlines(WATER_MIN, *WATER, color="black", lw=2.5, zorder=6, label=f"threshold: water peak {WATER_MIN:g}")
+    if show_fit and good:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)
+            mean_good = np.nanmean(good, axis=0)
+        p = fit_two_gaussians(mean_good)
+        ratio = water_fat(mean_good)
+        x = np.linspace(2, 25, 600)
+        for (height, centre, sigma), colour in ((p[:3], FAT_COLOUR), (p[3:], WATER_COLOUR)):
+            within = (x >= centre - 3 * sigma) & (x <= centre + 3 * sigma)
+            ax.fill_between(x[within], gaussian(x[within], height, centre, sigma), color=colour, alpha=0.25, lw=0)
+        ax.plot(x, two_gaussians(x, *p), color="red", ls="--", lw=1.4, zorder=5, label="fit to the usable scans")
+        ax.set_title(f"{side}, {label}: {len(good)} of {len(records)} usable\nWater:Fat = {ratio:.2f}")
+    else:
+        ax.set_title(f"{side}, {label}: 0 of {len(records)} usable\nnot used")
+    ax.set(xlabel="q (nm⁻¹)", xlim=(2, 25))
+    ax.set_xticks([5, 10, 15, 20, 25])
+    ax.grid(alpha=0.3)
+    ax.legend(frameon=False, fontsize=5, loc="upper left")
+    ax.set_box_aspect(1)
+
+plt.rcParams["font.size"] = 7
+fig, axes = plt.subplots(1, 3, figsize=(9, 3.6), sharey=True)
+sides = sorted(("LEFT", "RIGHT"), key=lambda side: found[example_nova, side][0] != "NORMAL")
+plot_breast(axes[0], example_nova, sides[0], show_fit=True)
+plot_breast(axes[1], example_nova, sides[1], show_fit=True)
+plot_breast(axes[2], rejected_example[0], rejected_example[1], show_fit=False)
+axes[0].set_ylabel("I(q), prepared")
+axes[0].set_ylim(0, None)
+fig.tight_layout()
+plt.show()
+plt.rcParams["font.size"] = 10
+```
+
+```{python}
+#| include: false
+from clinical import dense_share, rule_groups
+usable_results = rule_results(WATER_MIN, CENTRE_MIN)
+rejected_results = rule_results(WATER_MIN, CENTRE_MIN, rejected=True)
+every_results = rule_results(-np.inf, -np.inf)
+def share(results):
+    higher, total, _ = results["CANCER vs NORMAL"]
+    return f"{higher}/{total} ({higher / total:.0%})"
+def ci(results):
+    higher, total, _ = results["CANCER vs NORMAL"]
+    interval = binomtest(higher, total).proportion_ci(method="exact")
+    return f"{interval.low:.0%}–{interval.high:.0%}"
+def p_value(results):
+    return f"{results['CANCER vs NORMAL'][2]:.2g}"
+usable_share = np.mean([usable(h, c, WATER_MIN, CENTRE_MIN) for *_, h, c in scan_records])
+```
+
+This fixed threshold is for **single-point** Human 1.0 scans, when only a few beams are placed. It is also the natural **stopgap** on Human 1.0
+while mapping is not yet available (@sec-mapping): apply the same check during scanning and only keep a position if the short look is water-rich.
+Chapter 1 (@sec-water-rich) makes the same “wet = information” point with a top/bottom `{python} PART`% cut, which is the natural rule once a
+whole breast is mapped.
+
+@fig-usable-rejected applies the threshold to every breast: rejected (fatty) scans look the same for all three labels; usable scans are wetter
+for BENIGN and CANCER than for NORMAL, with BENIGN and CANCER almost the same under this cut. The paired comparison that works is CANCER vs
+NORMAL (@sec-glandular-details).
+
+```{python}
+#| label: fig-usable-rejected
+#| fig-cap: "The mean prepared curve of each cohort, each breast the mean of its rejected scans (**left**) or its usable, water-rich scans (**right**), with the water-peak threshold marked. A breast with both kinds of scan appears in both panels. Rejected scans overlap for all three labels; usable scans are wetter for BENIGN and CANCER than for NORMAL, with BENIGN and CANCER almost the same."
+rejected_by_label = {lab: [] for lab in COHORTS}
+usable_by_label = {lab: [] for lab in COHORTS}
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore", RuntimeWarning)
+    for (nova, side, label), curves in breast_rej.items():
+        rejected_by_label[label].append(np.nanmean(curves, axis=0))
+    for (nova, side, label), curves in breast_use.items():
+        usable_by_label[label].append(np.nanmean(curves, axis=0))
+
+together = np.vstack([np.vstack(c) for c in list(rejected_by_label.values()) + list(usable_by_label.values()) if c])
+covered = np.flatnonzero(np.isfinite(together).all(axis=0))
+columns = slice(covered[0], covered[-1] + 1)
+mean_water = {}
+
+plt.rcParams["font.size"] = 7
+fig, (rej_ax, use_ax) = plt.subplots(1, 2, figsize=(8, 3.8), sharey=True)
+for ax, curves_by_label, title in ((rej_ax, rejected_by_label, "Rejected scans"), (use_ax, usable_by_label, "Usable, water-rich scans")):
+    ax.set_box_aspect(1)
+    for label in COHORTS:
+        stack = np.vstack(curves_by_label[label])
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)
+            mean = np.nanmean(stack, axis=0)
+        mean_water[title, label] = float(np.nanmean(mean[(q >= WATER[0]) & (q <= WATER[1])]))
+        colour = ne.STATUS_COLOURS[label]
+        ax.plot(q[columns], mean[columns], color=colour, lw=1.6,
+                label=f"{label}: {len(curves_by_label[label])} breasts, water peak {mean_water[title, label]:.2f}")
+    ax.axvline(14, color="black", ls="--", lw=0.8)
+    ax.hlines(WATER_MIN, *WATER, color="black", lw=2.5, zorder=6)
+    ax.set(title=title, xlabel="q (nm⁻¹)", xlim=(2, q[columns][-1]))
+    ax.set_xticks([5, 10, 15, 20])
+    ax.grid(alpha=0.3)
+    ax.legend(frameon=False, loc="upper right", fontsize=6)
+rej_ax.set_ylabel("I(q), prepared (fat peak = 1)")
+fig.tight_layout()
+plt.show()
+plt.rcParams["font.size"] = 10
+```
+
+## Before and after
+
+The same paired comparison, one number per patient, using every scan, then only the usable scans, then only the rejected ones:
+
+| Scans used | CANCER breast higher | 95% CI | p (binomial, against 50%) |
+|---|---|---|---|
+| Every scan (before) | `{python} share(every_results)` | `{python} ci(every_results)` | `{python} p_value(every_results)` |
+| **Usable scans (after)** | **`{python} share(usable_results)`** | **`{python} ci(usable_results)`** | **`{python} p_value(usable_results)`** |
+| Rejected scans | `{python} share(rejected_results)` | `{python} ci(rejected_results)` | `{python} p_value(rejected_results)` |
+
+Using every scan, the CANCER breast is already the wetter one in most patients, but the fatty scans dilute the signal. Taking them out raises the
+share to `{python} share(usable_results)`; the fatty scans on their own are at chance. The rule accepts
+`{python} f"{usable_share:.0%}"` of all scans. Every patient with both breasts usable under this rule is plotted in @sec-usable-patients. Further
+checks on the threshold and who is left out are in @sec-glandular-details.
+
+## Who the rule compares
+
+As in @sec-water-rich, denser tissue is where the signal is. Under this rule the patients compared are mostly BI-RADS C or D:
+**`{python} f"{dense_share['compared']:.0%}"`** of `{python} len(rule_groups['compared'])`, against
+`{python} f"{dense_share['left out']:.0%}"` of the `{python} len(rule_groups['left out'])` left out (@fig-who-left-out).

@@ -1,0 +1,12 @@
+{
+  "hash": "278e81fb8245598bf119643a16252a2c",
+  "result": {
+    "engine": "jupyter",
+    "markdown": "# Limitations {#sec-limitations}\n\n\n::: {.callout-warning title=\"What limits these results\"}\n1. **Small numbers.** The headline rests on 18 CANCER/NORMAL patients: 83%, with a 95%\n   confidence interval of 59%–96%. It is a pilot result.\n2. **Only CANCER vs NORMAL is supported on the threshold rule.** The wettest 15% of samples separate NORMAL &lt; BENIGN &lt; CANCER (@fig-top15), but\n   under the fixed usable-scan cut of @sec-the-rule BENIGN and CANCER look almost the same, and the paired test for BENIGN vs NORMAL is\n   10/27 \\(37%\\) and for CANCER vs BENIGN 2/5 \\(40%\\),\n   neither above chance. Distinguishing benign from cancer is what clinicians need most, and this analysis does not yet do it. **Mapping would\n   address this:** a whole-breast map lets us keep the wettest tissue in each breast (the top-15% idea of @sec-water-rich) and compare that,\n   instead of a few single points that only just clear a fixed threshold (@sec-mapping).\n3. **Few young CANCER breasts.** Only 2 CANCER breasts under 40 have a usable scan, so nothing can be said about that age group\n   (@sec-usable-and-rejected-scans-by-age).\n4. **A thin healthy baseline.** Only 2 NORMAL/NORMAL patients have usable scans in both breasts, so how different two healthy\n   breasts are is barely measured (@sec-glandular-details).\n5. **The rule selects dense breasts.** BI-RADS C/D (dense) make up 82% of the patients compared against\n   39% of those left out (@fig-who-left-out). The result applies to dense breasts; for fattier breasts it\n   currently says nothing.\n6. **The threshold sits at a peak.** The CANCER vs NORMAL share is 68% at 0\\.25 \\(17/25\\)\\, 83% at 0\\.35 \\(15/18\\)\\, 67% at 0\\.45 \\(10/15\\)\\, 78% at 0\\.55 \\(7/9\\). The chosen 0\\.35 is at a\n   peak of this curve (@fig-on-the-fly), so the 83% is likely the optimistic end, and it was chosen on the same\n   patients it is reported on. The result stays above chance at every threshold. **Mapping would address this:** selection becomes a percentile\n   within each breast after the scan, not a global threshold tuned on this cohort (@sec-mapping).\n:::\n\n",
+    "supporting": [
+      "limitations_files"
+    ],
+    "filters": [],
+    "includes": {}
+  }
+}

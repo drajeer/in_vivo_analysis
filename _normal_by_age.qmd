@@ -1,0 +1,111 @@
+# Usable and rejected scans by age
+
+```{python}
+#| include: false
+from cohort_common import *
+```
+
+Breasts are averaged within each age band, separately for NORMAL, BENIGN and CANCER, twice: once using only the scans that pass the test
+(usable), and once using only the scans it rejects. In each, a breast is the mean of the scans used. This shows what the kept and the
+discarded scans look like at different ages.
+
+```{python}
+#| include: false
+AGE_BANDS = ((0, 40, "under 40"), (40, 50, "40–49"), (50, np.inf, "50 and over"))
+BAND_NAMES = [name for *_, name in AGE_BANDS]
+
+def band_summary(breasts):
+    """{label: {band: (mean curve, SD curve, breasts)}} for breasts {(nova, side, label): [curves]} whose patient has an age."""
+    grouped = {lab: {name: [] for name in BAND_NAMES} for lab in COHORTS}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        for (nova, side, label), curves in breasts.items():
+            for low, high, name in AGE_BANDS:
+                if nova in nova_age and low <= nova_age[nova] < high:
+                    grouped[label][name].append(np.nanmean(curves, axis=0))
+        return {lab: {name: (np.nanmean(c, axis=0), np.nanstd(c, axis=0), len(c)) for name, c in by_band.items() if c}
+                for lab, by_band in grouped.items()}
+
+summaries = {"usable": band_summary(breast_use), "rejected": band_summary(breast_rej)}
+
+# one q range and one y range for both figures, so they can be compared
+stack = np.vstack([mean for s in summaries.values() for by_band in s.values() for mean, _, _ in by_band.values()])
+covered = np.flatnonzero(np.isfinite(stack).all(axis=0))
+columns = slice(covered[0], covered[-1] + 1)
+y_top = 1.05 * max(np.nanmax((mean + sd)[columns]) for s in summaries.values() for by_band in s.values()
+                   for mean, sd, _ in by_band.values())
+
+def plot_bands(summary):
+    plt.rcParams["font.size"] = 7
+    fig, axes = plt.subplots(1, 3, figsize=(8, 3.4), sharey=True)
+    for ax, name in zip(axes, BAND_NAMES):
+        ax.set_box_aspect(1)
+        for label in COHORTS:
+            if name not in summary[label]:
+                continue
+            mean, sd, n = summary[label][name]
+            colour = ne.STATUS_COLOURS[label]
+            ax.fill_between(q[columns], (mean - sd)[columns], (mean + sd)[columns], color=colour, alpha=0.15, lw=0)
+            ax.plot(q[columns], mean[columns], color=colour, lw=1.6, label=f"{label}: {n} breasts")
+        ax.hlines(WATER_MIN, *WATER, color="black", ls="--", lw=1.2)
+        ax.axvline(14, color="black", ls=":", lw=0.8)
+        ax.set(title=f"Age {name}", xlabel="q (nm⁻¹)", xlim=(2, q[columns][-1]), ylim=(0, y_top))
+        ax.set_xticks([5, 10, 15, 20])
+        ax.grid(alpha=0.3)
+        ax.legend(frameon=False, loc="upper right", fontsize=5.5)
+    axes[0].set_ylabel("I(q), stretched")
+    fig.tight_layout()
+    plt.show()
+    plt.rcParams["font.size"] = 10
+
+def water_height(kind, label, name):
+    if name not in summaries[kind][label]:
+        return "–"
+    mean, _, n = summaries[kind][label][name]
+    return f"{np.nanmean(mean[(q >= WATER[0]) & (q <= WATER[1])]):.2f} ({n})"
+
+def cell_height(kind, label, name):
+    mean, _, _ = summaries[kind][label][name]
+    return float(np.nanmean(mean[(q >= WATER[0]) & (q <= WATER[1])]))
+
+cell_values = [cell_height(kind, label, name) for label in COHORTS for kind in summaries for name in BAND_NAMES]
+cell_norm = plt.Normalize(np.nanmin(cell_values), np.nanmax(cell_values))
+
+def cell_style(value):
+    """The cell's colour on the heatmaps' scale (yellow high, dark blue low), with text that stays readable on it."""
+    rgb = cmap(cell_norm(value))[:3]
+    text = "black" if 0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2] > 0.5 else "white"
+    return f"background-color: {plt.matplotlib.colors.to_hex(rgb)}; color: {text}"
+
+water_table = "\n".join(
+    ["<table class='table'>", "<thead><tr><th>Cohort</th><th>Scans used</th>" + "".join(f"<th>{name}</th>" for name in BAND_NAMES) + "</tr></thead><tbody>"]
+    + [f"<tr><td>{label}</td><td>{kind}</td>"
+       + "".join(f"<td style='{cell_style(cell_height(kind, label, name))}'>{water_height(kind, label, name)}</td>" for name in BAND_NAMES) + "</tr>"
+       for label in COHORTS for kind in summaries]
+    + ["</tbody></table>"])
+```
+
+```{python}
+#| label: fig-usable-by-age
+#| fig-cap: "**Usable scans.** Mean prepared curve of NORMAL, BENIGN and CANCER breasts, one panel per age band (each breast is the mean of its usable scans), with ±1 SD across breasts shaded. The dashed line is the usable-scan water threshold over q 20–22."
+plot_bands(summaries["usable"])
+```
+
+```{python}
+#| label: fig-rejected-by-age
+#| fig-cap: "**Rejected scans.** As @fig-usable-by-age, but each breast is the mean of the scans the test rejects."
+plot_bands(summaries["rejected"])
+```
+
+Mean water peak height (q 20–22) of each band's mean curve, with the number of breasts in brackets:
+
+```{python}
+#| echo: false
+#| output: asis
+print(water_table)
+```
+
+Breasts without an age are left out, and both figures share one y axis. The rejected scans look the same at every age and in every cohort, with
+a water peak near 0.2: once the water-bearing scans are taken out, what is left is fat, whatever the patient's age or label. The usable scans
+fall only a little with age, and CANCER stays about level while NORMAL and BENIGN drop, so in the older bands CANCER is the wettest. Only
+`{python} summaries['usable']['CANCER']['under 40'][2]` CANCER breasts are under 40, so those curves say little.

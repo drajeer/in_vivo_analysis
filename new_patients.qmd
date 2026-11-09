@@ -1,0 +1,69 @@
+# The newest patients in detail {#sec-new-patients}
+
+```{python}
+#| include: false
+from cohort_common import *
+from newest import *
+BOTH_TINT, ONE_TINT, NONE_TINT = "#c8e6c9", "#ffe0b2", "#ffcdd2"   # green, orange, red
+```
+
+The newest patients, from Nova `{python} FIRST_NEW` to Nova `{python} new_novas[-1]`, treated exactly like every other patient: each scan is put
+through the rule of @sec-the-rule (water peak height ≥ `{python} f"{WATER_MIN:g}"` and water centred at q ≥ `{python} f"{CENTRE_MIN:g}"`),
+without looking at the labels, most of which are not in yet. Nova `{python} FIRST_NEW`-595 come from the main archive and Nova 596 onwards
+from the scans added on 9 November 2026 (measured 2-6 November), prepared in exactly the same way (@fig-preparation). Of their `{python} n_scans` scans, `{python} n_usable`
+(`{python} f"{n_usable / n_scans:.0%}"`) are usable, and **`{python} n_both` of the `{python} len(new_novas)` patients** have both breasts usable.
+Most labels are not in yet; once they are, the patients with both breasts usable can be used to test the comparison of @sec-the-rule
+(@sec-next-steps).
+
+```{python}
+#| label: fig-new-patients
+#| fig-cap: "Every prepared scan of the newest patients, one panel per patient, tinted by the outcome as in the table (green both breasts usable, orange one, red neither). Usable scans are coloured (left breast blue, right orange), scans the rule rejects are grey and dashed; the black bar is the threshold on the water peak (q 20-22)."
+COLUMNS = 8
+rows_needed = int(np.ceil(len(new_novas) / COLUMNS))
+plt.rcParams["font.size"] = 6
+fig, axes = plt.subplots(rows_needed, COLUMNS, figsize=(10, 1.45 * rows_needed + 0.3), sharex=True, sharey=True, squeeze=False)
+for ax, nova in zip(axes.flat, new_novas):
+    counts = []
+    for side, colour in (("LEFT", "tab:blue"), ("RIGHT", "tab:orange")):
+        _, n_good, n_all, _ = breast_summary(nova, side)
+        counts.append(f"{side[0]} {n_good}/{n_all}")
+        for _, curve, _, _, ok in new_records.get((nova, side), []):
+            ax.plot(q, curve, color=colour if ok else "grey", lw=0.8 if ok else 0.6, ls="-" if ok else "--")
+    ax.hlines(WATER_MIN, *WATER, color="black", lw=2, zorder=5)
+    ax.set_facecolor({"both": BOTH_TINT, "one ": ONE_TINT}.get(outcomes[nova][:4], NONE_TINT))
+    ax.set_title(f"Nova {nova}: {', '.join(counts)}", fontsize=6)
+    ax.set(xlim=(2, 25), ylim=(-0.1, 1.8))
+for ax in axes.flat[len(new_novas):]:
+    ax.axis("off")
+for ax in axes[-1]:
+    ax.set_xlabel("q (nm⁻¹)")
+fig.tight_layout(pad=0.4)
+plt.show()
+plt.rcParams["font.size"] = 10
+```
+
+```{python}
+#| echo: false
+#| output: asis
+def fmt_ratio(value):
+    return "–" if not np.isfinite(value) else f"{value:.2f}"
+
+rows = []
+for nova in new_novas:
+    left, right = breast_summary(nova, "LEFT"), breast_summary(nova, "RIGHT")
+    tint = {"both": BOTH_TINT, "one ": ONE_TINT}.get(outcomes[nova][:4], NONE_TINT)
+    labels = left[0] if left[0] == right[0] else f"{left[0]} / {right[0]}"
+    cells = [f"Nova {nova}", labels, f"{left[1]} of {left[2]}", f"{right[1]} of {right[2]}", fmt_ratio(left[3]), fmt_ratio(right[3]), outcomes[nova]]
+    rows.append(f'<tr style="background:{tint}">' + "".join(
+        f'<td style="background:{tint}; white-space:{"nowrap" if k == 0 else "normal"}; text-align:{"left" if k < 2 else "center"}">{c}</td>'
+        for k, c in enumerate(cells)) + "</tr>")
+header = "".join(f"<th>{h}</th>" for h in ("Patient", "Labels (L / R)", "Usable scans, L", "Usable scans, R", "Water:Fat, L", "Water:Fat, R", "Outcome"))
+key = (f'<p style="font-size:0.85rem"><span style="background:{BOTH_TINT}; padding:0 0.4rem">both breasts usable</span> '
+       f'<span style="background:{ONE_TINT}; padding:0 0.4rem">one breast usable</span> '
+       f'<span style="background:{NONE_TINT}; padding:0 0.4rem">neither breast usable</span></p>')
+print(f'```{{=html}}\n<table class="table"><thead><tr>{header}</tr></thead><tbody>{"".join(rows)}</tbody></table>{key}\n```')
+```
+
+Water:Fat is worked out, as in @sec-the-rule, from the mean of each breast's usable scans only. The patients with neither breast usable have
+fat-dominated scans throughout, as most patients the rule leaves out do (@fig-who-left-out). Once their labels come in, the patients compared
+can be added to the comparison of @sec-the-rule (@sec-next-steps).

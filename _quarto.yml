@@ -1,0 +1,38 @@
+project:
+  type: book
+  output-dir: _book
+
+book:
+  title: "Human 1.0: Water:Fat in the breast"
+  chapters:
+    - index.qmd
+    - water_rich.qmd
+    - other_data.qmd
+    - tumour.qmd
+    - mapping.qmd
+    - limitations.qmd
+    - next_steps.qmd
+    - references.qmd
+  appendices:
+    - preparation.qmd
+    - water_fat.qmd
+    - the_rule.qmd
+    - glandular_details.qmd
+    - fatty_breasts.qmd
+    - usable_patients.qmd
+    - new_patients.qmd
+    - tumour_details.qmd
+    - intensity.qmd
+
+format:
+  html:
+    toc: false
+    code-fold: true
+    include-in-header:
+      text: "<style>@media print { img { max-width: 100% !important; height: auto !important; } } img.figure-img { max-width: 100% !important; height: auto !important; } .cell-output-display { overflow-x: visible !important; } .headroom--unpinned { transform: none !important; top: 0 !important; }</style>"
+
+jupyter: xrdanalysis
+
+execute:
+  warning: false
+  freeze: auto

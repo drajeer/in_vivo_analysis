@@ -1,0 +1,135 @@
+# Summary {.unnumbered}
+
+```{python}
+#| include: false
+from cohort_common import *
+usable_results = rule_results(WATER_MIN, CENTRE_MIN)               # only the water-rich scans
+rejected_results = rule_results(WATER_MIN, CENTRE_MIN, rejected=True)  # only the rejected, fatty scans
+every_results = rule_results(-np.inf, -np.inf)                     # every scan
+
+def share(results):
+    higher, total, _ = results["CANCER vs NORMAL"]
+    return f"{higher / total:.0%}", f"{higher}/{total}"
+
+higher, compared, _ = usable_results["CANCER vs NORMAL"]
+interval = binomtest(higher, compared).proportion_ci(method="exact")
+```
+
+```{=html}
+<style>
+.summary-lead { font-size: 1.25rem; line-height: 1.5; margin: 0.5rem 0 1.5rem; }
+.summary-expect { border-left: 5px solid #1f77b4; background: #f2f7fc; border-radius: 6px; padding: 0.7rem 1rem; margin-bottom: 1rem; }
+.summary-expect p { margin: 0; }
+.summary-data { background: #f2f4f6; border-radius: 8px; padding: 0.6rem 1rem; margin-bottom: 1.5rem; }
+.summary-data p { margin: 0; }
+.summary-row { display: grid; gap: 1rem; margin-bottom: 1.5rem; }
+.summary-row.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.summary-row.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.summary-card { border: 1px solid #dee2e6; border-radius: 10px; padding: 1rem 1.1rem; background: #fafbfc; }
+.summary-card p { margin-bottom: 0.4rem; font-size: 0.95rem; }
+.summary-card.glandular { border-top: 5px solid #1f77b4; }
+.summary-card.every { border-top: 5px solid #888; }
+.summary-card.fatty { border-top: 5px solid #d4a017; }
+.summary-caveat { border-left: 5px solid #e8890c; background: #fdf3e6; border-radius: 6px; padding: 0.5rem 1rem; margin-bottom: 1.5rem; }
+.summary-caveat p { margin: 0; font-size: 0.9rem; }
+.summary-card.recommended { border: 2px solid #1f77b4; background: #f2f7fc; }
+.summary-number { font-size: 2.6rem; font-weight: 700; line-height: 1.1; }
+.glandular .summary-number { color: #1f77b4; }
+.every .summary-number { color: #666; }
+.fatty .summary-number { color: #b8860b; }
+.summary-label { font-weight: 600; }
+.summary-small { font-size: 0.85rem; color: #555; }
+.summary-badge { display: inline-block; font-size: 0.75rem; font-weight: 700; color: white; background: #1f77b4; border-radius: 4px; padding: 0.1rem 0.45rem; margin-left: 0.3rem; vertical-align: middle; }
+h2.summary-heading, .summary-heading { margin-top: 0.5rem; }
+@media (max-width: 800px) { .summary-row.three, .summary-row.two { grid-template-columns: 1fr; } }
+</style>
+```
+
+::: {.summary-lead}
+Human 1.0 shows that the difference between NORMAL and CANCER breasts is in the **water-rich scans**. Measured there, a basic analysis points to
+the CANCER breast rather than the NORMAL one, matching synchrotron and ex-vivo data on the water-rich side.
+:::
+
+::: {.summary-expect}
+**What we expect:** a normal breast is mostly fat with some glandular/fibrous tissue. Cancer replaces fat with cells and remodelled fibrous tissue,
+which hold more water. Each breast gets one number, its **Water:Fat ratio**: the area of its water peak divided by the area of its fat peak, from
+two fitted Gaussians. Comparing a patient's two breasts, the **CANCER breast should have the higher Water:Fat**.
+:::
+
+::: {.summary-data}
+**Data:** **`{python} len(patient_novas)`** patients analysed with Human 1.0 (NORMAL, BENIGN or CANCER); **`{python} len(analysis_novas)`** used,
+after leaving out `{python} len(patient_novas) - len(analysis_novas)` with a large left/right intensity imbalance ([Appendix I](intensity.qmd)).
+:::
+
+::: {.summary-row .two}
+::: {.summary-card .glandular}
+[1. The difference is in the water-rich scans]{.summary-label}
+
+In the **fattiest 15%** of samples the three cohorts look the same; in the **wettest 15%** they separate NORMAL &lt; BENIGN &lt; CANCER. The
+information is in the water-rich tissue — denser breasts are better for us; mammography's weakness is our strength
+([Chapter 1](water_rich.qmd)).
+:::
+
+::: {.summary-card}
+[2. It matches other data]{.summary-label}
+
+That wettest-15% ordering matches synchrotron and Keele ex-vivo data. A fixed water-peak threshold for single-point scans
+([Appendix C](the_rule.qmd)) also keeps the wet tissue; the paired test there supports CANCER vs NORMAL
+([Chapter 2](other_data.qmd)).
+:::
+
+::: {.summary-card}
+[3. Rigorous tumour targeting is not needed]{.summary-label}
+
+The tumours are small and only a few beams are placed approximately, yet the signal holds where the beam goes through glandular tissue: changes
+appear wide-reaching in the glandular breast, not confined to the tumour ([Chapter 3](tumour.qmd)).
+:::
+
+::: {.summary-card .recommended}
+[4. Mapping for Human 2.0]{.summary-label} [Proposal]{.summary-badge}
+
+Scan a grid over the whole breast and select the wettest tissue after the scan. The water-peak rule ([Appendix C](the_rule.qmd)) could be a
+stopgap on Human 1.0; mapping is the recommendation ([Chapter 4](mapping.qmd)).
+:::
+:::
+
+```{python}
+#| label: fig-summary-examples
+#| fig-cap: "**Top**: water-rich scans (usable). **Bottom**: fatty scans the rule rejects. Each panel is one patient; each curve the mean of that breast's scans of that kind. On water-rich scans the CANCER breast stands out; on fatty scans NORMAL/NORMAL and NORMAL/CANCER look alike."
+# top row: both breasts usable; bottom row: both breasts have rejected (fatty) scans only
+EXAMPLES = ((266, False), (439, False), (506, True), (250, True))  # (nova, use rejected scans)
+found_use = rule_breasts(WATER_MIN, CENTRE_MIN)
+found_rej = rule_breasts(WATER_MIN, CENTRE_MIN, rejected=True)
+plt.rcParams["font.size"] = 7
+fig, axes = plt.subplots(2, 2, figsize=(8, 5.2), sharex=True, sharey=True)
+for ax, (nova, rejected) in zip(axes.flat, EXAMPLES):
+    found = found_rej if rejected else found_use
+    labels = []
+    for side, style in (("LEFT", "-"), ("RIGHT", "--")):
+        label, ratio, n_kept, _ = found[nova, side]
+        curves = [curve for n, s, _, curve, height, centre in scan_records
+                  if n == nova and s == side and usable(height, centre, WATER_MIN, CENTRE_MIN) != rejected]
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)
+            ax.plot(q, np.nanmean(curves, axis=0), color=ne.STATUS_COLOURS[label], ls=style, lw=1.6,
+                    label=f"{side} {label}, Water:Fat {ratio:.2f}")
+        labels.append(label)
+    ax.axvspan(*WATER, color="grey", alpha=0.12, lw=0)
+    ax.hlines(WATER_MIN, *WATER, color="black", lw=1.5, zorder=5)
+    kind = "fatty scans" if rejected else "water-rich scans"
+    ax.set(title=f"{' / '.join(labels)}: {kind}", xlim=(2, 25))
+    ax.grid(alpha=0.3)
+    ax.legend(frameon=False, fontsize=6, loc="upper left")
+for ax in axes[-1]:
+    ax.set_xlabel("q (nm⁻¹)")
+for ax in axes[:, 0]:
+    ax.set_ylabel("I(q), prepared")
+fig.tight_layout()
+plt.show()
+plt.rcParams["font.size"] = 10
+```
+
+::: {.summary-caveat}
+**A pilot result:** `{python} compared` CANCER/NORMAL patients, 95% CI `{python} f"{interval.low:.0%}–{interval.high:.0%}"`, and mostly dense
+breasts. All limitations are in [Chapter 5](limitations.qmd).
+:::

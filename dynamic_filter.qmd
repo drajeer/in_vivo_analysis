@@ -1,0 +1,113 @@
+# A filter that follows age
+
+```{python}
+#| include: false
+from cohort_common import *
+
+DYNAMIC_YOUNG, DYNAMIC_HIGH = 30, 0.45
+DYNAMIC_OLD, DYNAMIC_LOW = 60, 0.25
+```
+
+Older breasts are fattier, so fewer of their scans pass the fixed water threshold of `{python} WATER_MIN` (@fig-usable-by-age). Here the
+threshold instead follows the patient's age: `{python} DYNAMIC_HIGH` at age `{python} DYNAMIC_YOUNG` and younger, falling in a straight line to
+`{python} DYNAMIC_LOW` at age `{python} DYNAMIC_OLD` and older. Patients without a recorded age keep the fixed threshold. The water centre rule is
+unchanged.
+
+```{python}
+#| include: false
+def threshold_at(age):
+    slope = (DYNAMIC_LOW - DYNAMIC_HIGH) / (DYNAMIC_OLD - DYNAMIC_YOUNG)
+    return float(np.clip(DYNAMIC_HIGH + slope * (age - DYNAMIC_YOUNG), DYNAMIC_LOW, DYNAMIC_HIGH))
+
+def dynamic_threshold(nova):
+    return threshold_at(nova_age[nova]) if nova in nova_age else WATER_MIN
+
+fixed = rule_results(WATER_MIN, CENTRE_MIN)
+dynamic = rule_results(dynamic_threshold, CENTRE_MIN)
+filters = {"fixed": (fixed, USABLE_COLOUR), "age-dependent": (dynamic, "tab:purple")}
+
+AGE_BANDS = ((0, 40, "under 40"), (40, 50, "40–49"), (50, np.inf, "50 and over"))
+
+def compared_by_band(min_height):
+    """CANCER vs NORMAL result in each age band, and for patients without an age."""
+    groups = {name: {n for n in analysis_novas if n in nova_age and low <= nova_age[n] < high} for low, high, name in AGE_BANDS}
+    groups["no age"] = {n for n in analysis_novas if n not in nova_age}
+    return {name: rule_results(min_height, CENTRE_MIN, novas)["CANCER vs NORMAL"] for name, novas in groups.items()}
+
+by_band = {"fixed": compared_by_band(WATER_MIN), "age-dependent": compared_by_band(dynamic_threshold)}
+band_table = "\n".join(["| Filter | " + " | ".join(by_band["fixed"]) + " |", "|---|" + "---|" * len(by_band["fixed"])]
+                       + [f"| {kind} | " + " | ".join(f"{h}/{n}" if n else "–" for h, n, _ in results.values()) + " |"
+                          for kind, results in by_band.items()])
+
+def kept_share(min_height, low, high):
+    """Share of the scans of patients aged low to high that the filter keeps."""
+    flags = [usable(height, centre, min_height(nova) if callable(min_height) else min_height, CENTRE_MIN)
+             for nova, _, label, _, height, centre in scan_records if nova in nova_age and low <= nova_age[nova] < high]
+    return np.mean(flags)
+
+kept_table = "\n".join(["| Filter | " + " | ".join(name for *_, name in AGE_BANDS) + " |", "|---|---|---|---|"]
+                       + [f"| {kind} | " + " | ".join(f"{kept_share(m, low, high):.0%}" for low, high, _ in AGE_BANDS) + " |"
+                          for kind, m in (("fixed", WATER_MIN), ("age-dependent", dynamic_threshold))])
+```
+
+```{python}
+#| label: fig-dynamic-filter
+#| fig-cap: "**Left**: every scan's water peak height (mean over q 20–22) against the patient's age, coloured by whether the age-dependent filter keeps it (purple) or rejects it (grey, including scans that fail the water centre rule); the solid line is the age-dependent threshold and the dashed line the fixed one. **Right**: the share of patients whose first-named breast has the higher Water:Fat with the fixed and the age-dependent filter, with the patients compared and the two-sided binomial p-value against 50%."
+rng = np.random.default_rng(0)
+plt.rcParams["font.size"] = 8
+fig, (left, right) = plt.subplots(1, 2, figsize=(8, 3.8))
+
+aged = [(nova_age[nova], height, usable(height, centre, dynamic_threshold(nova), CENTRE_MIN))
+        for nova, _, _, _, height, centre in scan_records if nova in nova_age and np.isfinite(height)]
+ages, heights, kept = (np.array(column) for column in zip(*aged))
+ages = ages + rng.uniform(-0.4, 0.4, len(ages))
+left.scatter(ages[~kept], heights[~kept], s=6, color=REJECTED_COLOUR, alpha=0.4, lw=0, label="rejected")
+left.scatter(ages[kept], heights[kept], s=6, color="tab:purple", alpha=0.6, lw=0, label="kept")
+age_line = np.linspace(ages.min() - 1, ages.max() + 1, 200)
+left.plot(age_line, [threshold_at(a) for a in age_line], color="black", lw=1.8, label="age-dependent threshold")
+left.axhline(WATER_MIN, color="black", ls="--", lw=1, label=f"fixed threshold ({WATER_MIN})")
+left.set(xlabel="Age (years)", ylabel="Water peak height (stretched)", ylim=(0, min(1.2, np.nanmax(heights) * 1.05)))
+left.grid(alpha=0.3)
+left.legend(frameon=True, framealpha=0.9, edgecolor="none", fontsize=6.5, loc="upper right", markerscale=2)
+
+width = 0.38
+for i, comparison in enumerate(COMPARISONS):
+    for j, (kind, (results, colour)) in enumerate(filters.items()):
+        higher, total, p = results[comparison]
+        x = i + (j - 0.5) * width
+        share = higher / total if total else 0
+        right.bar(x, share, width, color=colour, alpha=0.8, label=kind if i == 0 else None)
+        right.text(x, share + 0.02, f"{higher}/{total}\np={p:.3f}" if total else "none", ha="center", va="bottom", fontsize=6)
+right.axhline(0.5, color="black", ls=":", lw=1)
+right.set_xticks(range(len(COMPARISONS)), [c.replace(" vs ", "\nvs ") for c in COMPARISONS])
+right.set(ylim=(0, 1.15), ylabel="First-named breast has the higher Water:Fat")
+right.grid(alpha=0.3, axis="y")
+right.legend(frameon=False, fontsize=6.5, loc="upper right")
+fig.tight_layout()
+plt.show()
+plt.rcParams["font.size"] = 10
+```
+
+Share of each age band's scans that each filter keeps:
+
+```{python}
+#| echo: false
+#| output: asis
+print(kept_table)
+```
+
+CANCER vs NORMAL patients compared in each age band (first-named breast higher / compared):
+
+```{python}
+#| echo: false
+#| output: asis
+print(band_table)
+```
+
+The age-dependent filter keeps more of the older patients' scans and fewer of the youngest ones. That lets more patients be compared:
+CANCER vs NORMAL goes from `{python} rule_text(fixed, "CANCER vs NORMAL")` (p = `{python} f"{fixed['CANCER vs NORMAL'][2]:.3f}"`) to
+`{python} rule_text(dynamic, "CANCER vs NORMAL")` (p = `{python} f"{dynamic['CANCER vs NORMAL'][2]:.3f}"`). All the new patients are 50 and
+over, and they split about evenly: the band goes from `{python} "{}/{}".format(*by_band['fixed']['50 and over'][:2])` to
+`{python} "{}/{}".format(*by_band['age-dependent']['50 and over'][:2])`. The stricter threshold for the youngest patients changes no comparison
+under 40. So lowering the threshold to 0.25 for the oldest patients lets in scans fatty enough to hide the difference. BENIGN vs NORMAL and
+CANCER vs BENIGN stay at or below chance with either filter.

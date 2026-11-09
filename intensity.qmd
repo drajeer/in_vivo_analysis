@@ -1,0 +1,64 @@
+# Excluding patients with a large left/right intensity imbalance {#sec-intensity}
+
+```{python}
+#| include: false
+from cohort_common import *
+```
+
+```{python}
+#| echo: false
+# INTENSITY_RATIO_MAX, intensity_ratio, intensity_skip and analysis_novas come from cohort_common
+print(f"{len(intensity_skip)} patients with image-total imbalance ≥ {INTENSITY_RATIO_MAX:g}× excluded; {len(analysis_novas)} left")
+```
+
+A few patients have one breast whose raw images are far brighter than the other (total detector counts), even at similar thickness. That imbalance
+is rare in Nova 250 onwards (typical left/right ratio near 1) and produces unreliable Water:Fat comparisons — Nova 396 is the example in
+@fig-intensity-imbalance, where the CANCER side's mean image total is about 2.4× the NORMAL side's and the NORMAL curve looks almost fat-free.
+From here on, a patient is dropped if the brighter breast's mean image total is at least **`{python} f"{INTENSITY_RATIO_MAX:g}"`×** the dimmer breast's
+(`breast_image_totals.csv`, summed over each Sample Main image before 1D reduction). That removes
+**`{python} len(intensity_skip)`** patients, including Nova 396; `{python} len(set(patient_novas) & intensity_skip)` of them are among the `{python} len(patient_novas)` patients of this analysis, leaving `{python} len(analysis_novas)`.
+
+```{python}
+#| label: fig-intensity-imbalance
+#| fig-cap: "An excluded patient: Nova 396. Mean image total on the CANCER (LEFT) side is 2.4× the NORMAL (RIGHT) side. **Left**: NORMAL scans after preparation — water-dominated, weak fat peak. **Right**: CANCER scans with a clear fat peak. Patients whose two breasts differ by ≥2× in mean image total are dropped before the Water:Fat comparisons."
+EXCLUDE_EXAMPLE = 396
+exclude_totals = {row.side: float(row.image_total_mean) for row in totals[totals.nova == EXCLUDE_EXAMPLE].itertuples()}
+exclude_scans = {}  # side: [(label, curve, water height)]
+for side, label, scan_q, curve, _ in ne.read_patients(ne.STORE_PATH, {EXCLUDE_EXAMPLE}, ne.REFERENCES["stretch"])[EXCLUDE_EXAMPLE][0]:
+    on_q = np.interp(q, scan_q, curve, left=np.nan, right=np.nan)
+    with np.errstate(all="ignore"):
+        height = np.nanmean(on_q[(q >= WATER[0]) & (q <= WATER[1])])
+    exclude_scans.setdefault(side, []).append((label, on_q, height))
+
+plt.rcParams["font.size"] = 7
+fig, axes = plt.subplots(1, 2, figsize=(8, 4.3), sharey=True)
+x = np.linspace(2, 25, 600)
+sides = sorted(exclude_scans, key=lambda side: exclude_scans[side][0][0] != "NORMAL")
+for ax, side in zip(axes, sides):
+    ax.set_box_aspect(1)
+    items = exclude_scans[side]
+    label = items[0][0]
+    curves = [curve for _, curve, _ in items]
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        mean = np.nanmean(curves, axis=0)
+    p = fit_two_gaussians(mean)
+    ratio = water_fat(mean)
+    for k, (_, curve, height) in enumerate(items):
+        ax.plot(q, curve, color=ne.STATUS_COLOURS[label], lw=0.9, label=f"scan {k + 1}: water {height:.2f}")
+    for (height, centre, sigma), colour in ((p[:3], FAT_COLOUR), (p[3:], WATER_COLOUR)):
+        within = (x >= centre - 3 * sigma) & (x <= centre + 3 * sigma)
+        ax.fill_between(x[within], gaussian(x[within], height, centre, sigma), color=colour, alpha=0.25, lw=0)
+    ax.plot(x, two_gaussians(x, *p), color="red", ls="--", lw=1.4, zorder=5, label="fat + water fit")
+    img_total = exclude_totals.get(side, np.nan)
+    ax.set(title=f"Nova {EXCLUDE_EXAMPLE} {side}, {label}: image total {img_total:.2g}\n"
+                  f"Water:Fat = {ratio:.2f}  (patient excluded: imbalance {intensity_ratio[EXCLUDE_EXAMPLE]:.2f}×)",
+           xlabel="q (nm⁻¹)", xlim=(2, 25), ylim=(0, 2))
+    ax.set_xticks([5, 10, 15, 20, 25])
+    ax.grid(alpha=0.3)
+    ax.legend(frameon=False, fontsize=6, loc="upper left")
+axes[0].set_ylabel("I(q), stretched")
+fig.tight_layout()
+plt.show()
+plt.rcParams["font.size"] = 10
+```

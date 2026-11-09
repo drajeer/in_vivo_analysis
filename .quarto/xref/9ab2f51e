@@ -1,0 +1,1 @@
+{"entries":[{"caption":"Left: ROC for NORMAL vs not-NORMAL among usable breasts (GroupKFold by patient; score = out-of-fold P(not-NORMAL)). Right: that score by true label.","key":"fig-normal-model","order":{"number":1,"section":[10,0,0,0,0,0,0]}}],"headings":[],"options":{"chapters":true}}

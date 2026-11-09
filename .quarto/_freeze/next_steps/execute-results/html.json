@@ -1,0 +1,12 @@
+{
+  "hash": "f5099c4311dd12fa9d7ccdbee5ae2f3f",
+  "result": {
+    "engine": "jupyter",
+    "markdown": "# Next steps {#sec-next-steps}\n\n\n1. **Label the newest patients.** The newest 45 patients have been put through the same water-peak rule, blind to labels:\n   52 of 265 scans (20%) are water-rich, and **11 patients** have\n   both breasts usable (@sec-new-patients). That usable rate is lower than the 39% in the main analysis. Once\n   labels are in, those patients can test the CANCER vs NORMAL result. Only 18 of 251 patients in\n   the main analysis ended up in the headline comparison, so this newest group will give a handful of pairs at best — enough to check the\n   direction, not to confirm the 83%.\n2. **Strengthen the baseline.** More NORMAL/NORMAL patients with usable scans in both breasts, to measure how different two healthy breasts are.\n3. **Keep the threshold fixed** when new labelled patients are added, rather than retuning it, so the peak at 0\\.35\n   (@sec-limitations) is not carried forward.\n4. **Trial mapping for Human 2.0.** Run the surface-then-XRD fly-scan protocol (1 Hz detector, speed-set collection, dynamic speed on thicker\n   tissue) and check that a whole-breast map finishes within the 5-minute target (@sec-mapping).\n\n",
+    "supporting": [
+      "next_steps_files"
+    ],
+    "filters": [],
+    "includes": {}
+  }
+}

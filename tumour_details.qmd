@@ -1,0 +1,53 @@
+# Tumour size by grade {#sec-tumour-details}
+
+```{python}
+#| include: false
+from cohort_common import *
+from tumours import sizes, grades, imaging_sizes, cancer_breasts, usable_breasts
+
+tumours = [(grades[key], sizes[key], key in usable_breasts) for key in sorted(cancer_breasts) if key in sizes and key in grades]
+imaged = [(grades[key], imaging_sizes[key], key in usable_breasts) for key in sorted(cancer_breasts) if key in imaging_sizes and key in grades]
+```
+
+The size of each tumour in our CANCER breasts, by grade, measured two ways. From the pathology reports, the **linear extent** of invasive tumour
+measured in the biopsy cores (the largest of a breast's specimens, lymph node specimens left out); from the radiology reports, the **largest mass
+measured on imaging** (mammogram, ultrasound or MRI). The grade is the **overall (Nottingham) grade** from the pathology reports, taken from the
+score out of 9 where the report gives one (3-5 grade 1, 6-7 grade 2, 8-9 grade 3) and from the stated grade otherwise. The imaging sizes are taken
+from the report text and can include more than one mass in a breast, so they are approximate.
+
+```{python}
+#| label: fig-tumour-size
+#| fig-cap: "Tumour size of each CANCER breast by overall grade; one dot per breast. **Left**: the linear extent of invasive tumour in the biopsy cores (pathology reports). **Right**: the largest mass measured on imaging (mammogram, ultrasound or MRI reports). Boxes span the middle half of the breasts, the thick line is the median, and the whiskers reach the furthest breast within 1.5 box-lengths. Breasts with at least one usable scan are blue, the others grey."
+GRADES = (1, 2, 3)
+rng = np.random.default_rng(0)  # the same horizontal jitter on every render
+
+def plot_by_grade(ax, values, ylabel, title):
+    by_grade = {g: [size for grade, size, _ in values if grade == g] for g in GRADES}
+    ax.boxplot([by_grade[g] for g in GRADES], positions=range(len(GRADES)), widths=0.5, showfliers=False, patch_artist=True,
+               boxprops=dict(facecolor="#d4ebe8", edgecolor="#2a9d8f"), whiskerprops=dict(color="#2a9d8f"), capprops=dict(color="#2a9d8f"),
+               medianprops=dict(color="#1d3557", lw=2.2))
+    for k, g in enumerate(GRADES):
+        for is_usable in (False, True):
+            here = [size for grade, size, ok in values if grade == g and ok == is_usable]
+            ax.scatter(k + rng.uniform(-0.18, 0.18, len(here)), here, s=14 if is_usable else 10, zorder=3,
+                       color=TOP_COLOUR if is_usable else "grey", alpha=0.9 if is_usable else 0.5,
+                       edgecolor="black" if is_usable else "none", lw=0.4,
+                       label=("usable scan" if is_usable else "no usable scan") if k == 0 else None)
+    labels = []
+    for g in GRADES:
+        here = [(size, ok) for grade, size, ok in values if grade == g]
+        labels.append(f"Grade {g}\nn={len(here)}\nmean {np.mean([s for s, _ in here]):.1f} mm\n{sum(ok for _, ok in here)} usable"
+                      if here else f"Grade {g}\n(n=0)")
+    ax.set_xticks(range(len(GRADES)), labels)
+    ax.set(ylabel=ylabel, title=title, ylim=(0, None))
+    ax.grid(alpha=0.3, axis="y")
+    ax.legend(frameon=False, loc="upper left")
+
+plt.rcParams["font.size"] = 7
+fig, (biopsy_ax, imaging_ax) = plt.subplots(1, 2, figsize=(8, 3.8))
+plot_by_grade(biopsy_ax, tumours, "Linear extent (mm)", "Biopsy cores")
+plot_by_grade(imaging_ax, imaged, "Largest mass on imaging (mm)", "Imaging")
+fig.tight_layout()
+plt.show()
+plt.rcParams["font.size"] = 10
+```

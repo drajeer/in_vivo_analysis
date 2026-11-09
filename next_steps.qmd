@@ -1,0 +1,22 @@
+# Next steps {#sec-next-steps}
+
+```{python}
+#| include: false
+from cohort_common import *
+from newest import new_novas, n_scans, n_usable, n_both
+
+dev_usable_share = np.mean([usable(h, c, WATER_MIN, CENTRE_MIN) for *_, h, c in scan_records])
+dev_compared = rule_results(WATER_MIN, CENTRE_MIN)["CANCER vs NORMAL"][1]
+```
+
+1. **Label the newest patients.** The newest `{python} len(new_novas)` patients have been put through the same water-peak rule, blind to labels:
+   `{python} n_usable` of `{python} n_scans` scans (`{python} f"{n_usable / n_scans:.0%}"`) are water-rich, and **`{python} n_both` patients** have
+   both breasts usable (@sec-new-patients). That usable rate is lower than the `{python} f"{dev_usable_share:.0%}"` in the main analysis. Once
+   labels are in, those patients can test the CANCER vs NORMAL result. Only `{python} dev_compared` of `{python} len(analysis_novas)` patients in
+   the main analysis ended up in the headline comparison, so this newest group will give a handful of pairs at best — enough to check the
+   direction, not to confirm the 83%.
+2. **Strengthen the baseline.** More NORMAL/NORMAL patients with usable scans in both breasts, to measure how different two healthy breasts are.
+3. **Keep the threshold fixed** when new labelled patients are added, rather than retuning it, so the peak at `{python} f"{WATER_MIN:g}"`
+   (@sec-limitations) is not carried forward.
+4. **Trial mapping for Human 2.0.** Run the surface-then-XRD fly-scan protocol (1 Hz detector, speed-set collection, dynamic speed on thicker
+   tissue) and check that a whole-breast map finishes within the 5-minute target (@sec-mapping).

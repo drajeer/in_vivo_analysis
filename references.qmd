@@ -1,0 +1,15 @@
+# References {.unnumbered}
+
+1. Wellings SR (1980). A hypothesis of the origin of human breast cancer from the terminal ductal lobular unit. <https://katalog.lib.cas.cz/KNAV/EdsRecord/edsair,edsair.doi.dedup.....4bf3524df62052306f08ee4109b0d6ce>
+2. Review of terminal duct lobular units as the histologic source of most breast cancers. <https://pmc.ncbi.nlm.nih.gov/articles/PMC4784982>
+3. Pinto Pereira SM et al. (2011). Localized fibroglandular tissue as a predictor of future tumor location within the breast. <https://pmc.ncbi.nlm.nih.gov/articles/PMC3154655>
+4. Regional density and the location of subsequent breast cancer (2017). BMC Cancer. <https://link.springer.com/10.1186/s12885-017-3270-0>
+5. Provenzano PP et al. (2006). Collagen reorganization at the tumor-stromal interface facilitates local invasion. BMC Medicine 4:38. <https://link.springer.com/article/10.1186/1741-7015-4-38>
+6. Small-angle X-ray scattering tensor tomography and X-ray fluorescence CT of collagen remodelling in a breast tumour (2024). Scientific Reports. <https://www.nature.com/articles/s41598-024-51945-4>
+7. Fibre diffraction of breast biopsies from patients with carcinoma (2002). <https://iucrdata.iucr.org/s/issues/2002/02/00/ml0020/ml0020.pdf>
+8. Kolb TM, Lichy J, Newhouse JH (2002). Comparison of the performance of screening mammography, physical examination, and breast US and evaluation of factors that influence them: an analysis of 27,825 patient evaluations. Radiology 225:165-175. <https://doi.org/10.1148/radiol.2251011667>
+9. Carney PA et al. (2003). Individual and combined effects of age, breast density, and hormone replacement therapy use on the accuracy of screening mammography. Annals of Internal Medicine 138:168-175. <https://doi.org/10.7326/0003-4819-138-3-200302040-00008>
+10. Conceição ALC, Antoniassi M, Poletti ME, Caldas LVE (2010). Preliminary study of human breast tissue using synchrotron radiation combining WAXS and SAXS techniques. Applied Radiation and Isotopes 68:799-803. <https://doi.org/10.1016/j.apradiso.2009.09.064>
+11. Conceição ALC, Poletti ME (2010). Identification of molecular structures of normal and pathological human breast tissue using synchrotron radiation. AIP Conference Proceedings 1266:72-77. <https://pubs.aip.org/aip/acp/article/1266/1/72/868841>
+12. Kidane G, Speller RD, Royle GJ, Hanby AM (1999). X-ray scattering signatures for normal and neoplastic breast tissues. Physics in Medicine and Biology 44:1791-1802. <https://doi.org/10.1088/0031-9155/44/7/316>
+13. Ex-vivo X-ray diffraction of breast tissue, Keele University (unpublished data).

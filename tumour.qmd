@@ -1,0 +1,93 @@
+# Rigorous targeting of the tumour is not necessary {#sec-tumour}
+
+```{python}
+#| include: false
+from cohort_common import *
+from tumours import sizes, imaging_sizes, cancer_breasts
+
+usable_results = rule_results(WATER_MIN, CENTRE_MIN)
+found = rule_breasts(WATER_MIN, CENTRE_MIN)
+
+# every CANCER breast with a size, split by whether it has a usable (water-rich) scan
+usable_cancer = {key for key, (label, *_) in found.items() if label == "CANCER"}
+def size_groups(size_of):
+    """(usable sizes, rejected-only sizes) for CANCER breasts in size_of."""
+    usable, rejected = [], []
+    for key in sorted(cancer_breasts):
+        if key not in size_of:
+            continue
+        (usable if key in usable_cancer else rejected).append(size_of[key])
+    return np.array(usable), np.array(rejected)
+
+biopsy_use, biopsy_rej = size_groups(sizes)
+imaging_use, imaging_rej = size_groups(imaging_sizes)
+biopsy_all = np.concatenate([biopsy_use, biopsy_rej]) if len(biopsy_rej) else biopsy_use
+imaging_all = np.concatenate([imaging_use, imaging_rej]) if len(imaging_rej) else imaging_use
+scans_per_cancer = [sum(1 for nn, ss, label, *_ in scan_records if nn == n and ss == s and label == "CANCER")
+                    for n, s in cancer_breasts]
+median_scans = int(np.median(scans_per_cancer)) if scans_per_cancer else 0
+```
+
+::: {.callout-note title="Finding 3"}
+**Rigorous targeting of the tumour is not necessary.** The tumours we have analysed are small —
+`{python} f"{biopsy_all.min():.0f}–{biopsy_all.max():.0f}"` mm on biopsy
+(`{python} len(biopsy_all)` breasts) and `{python} f"{imaging_all.min():.0f}–{imaging_all.max():.0f}"` mm on imaging
+(`{python} len(imaging_all)` breasts) — and each breast is measured with only about `{python} median_scans` beams, placed approximately from the
+mammogram or ultrasound. The chance that those beams hit the tumour itself is small. Yet where the beams go through glandular, water-rich tissue,
+the CANCER breast has the higher Water:Fat in **`{python} rule_text(usable_results, "CANCER vs NORMAL")`** of patients (@sec-the-rule). The
+data point to **wide-reaching changes in the breast, but in the glandular tissue**, not to a signal that needs the tumour in the beam.
+:::
+
+## The tumours are small; the beams are few
+
+```{python}
+#| label: fig-tumour-sizes
+#| fig-cap: "Tumour size of every CANCER breast with a reported size. **Left**: linear extent in the biopsy cores (pathology). **Right**: largest mass on imaging (mammogram, ultrasound or MRI). Blue: breast has at least one usable, water-rich scan; grey: only rejected (fatty) scans. One dot per breast."
+plt.rcParams["font.size"] = 7
+fig, (biopsy_ax, imaging_ax) = plt.subplots(1, 2, figsize=(8, 3.6), sharey=False)
+rng = np.random.default_rng(0)
+
+def plot_usable_rejected(ax, usable_vals, rejected_vals, ylabel, title):
+    groups = [(0, usable_vals, TOP_COLOUR, "usable scan"), (1, rejected_vals, "grey", "rejected scans only")]
+    box_with_points(ax, [(x, list(vals), colour) for x, vals, colour, _ in groups if len(vals)], rng)
+    ax.set_xticks([0, 1], [f"usable\n(n = {len(usable_vals)})", f"rejected only\n(n = {len(rejected_vals)})"])
+    ax.set(ylabel=ylabel, title=title, ylim=(0, None))
+    ax.grid(alpha=0.3, axis="y")
+    from matplotlib.patches import Patch
+    ax.legend(handles=[Patch(color=TOP_COLOUR, alpha=0.5, label="usable (water-rich) scan"),
+                       Patch(color="grey", alpha=0.5, label="rejected scans only")],
+              frameon=False, loc="upper right", fontsize=6)
+
+plot_usable_rejected(biopsy_ax, biopsy_use, biopsy_rej, "Linear extent (mm)", "Biopsy cores")
+plot_usable_rejected(imaging_ax, imaging_use, imaging_rej, "Largest mass on imaging (mm)", "Imaging")
+fig.tight_layout()
+plt.show()
+plt.rcParams["font.size"] = 10
+```
+
+Over every CANCER breast with a reported size, the tumours run from `{python} f"{biopsy_all.min():.0f}"` to
+`{python} f"{biopsy_all.max():.0f}"` mm on biopsy (median `{python} f"{np.median(biopsy_all):.0f}"` mm,
+`{python} len(biopsy_all)` breasts) and from `{python} f"{imaging_all.min():.0f}"` to
+`{python} f"{imaging_all.max():.0f}"` mm on imaging (median `{python} f"{np.median(imaging_all):.0f}"` mm,
+`{python} len(imaging_all)` breasts). Usable and rejected-only breasts have similar size ranges (imaging medians
+`{python} f"{np.median(imaging_use):.0f}"` mm and `{python} f"{np.median(imaging_rej):.0f}"` mm), so having a water-rich scan is not simply a
+matter of a larger tumour. The biopsy size is only the length of tumour along a needle core; imaging measures the mass itself and is the better
+sense of how large a target the tumour is. Even so, most are a couple of centimetres or less. Size by grade is in @sec-tumour-details.
+
+Each breast is scanned only a few times — typically `{python} median_scans` beams — and the operator places them from a quadrant, a clock
+position and a distance from the nipple. The breast sits differently on our instrument than on the mammogram. Hitting a
+`{python} f"{np.median(imaging_all):.0f}"` mm mass with `{python} median_scans` approximately placed beams is unlikely to be the rule; missing the
+tumour altogether will often be the case. We have no data on where each beam landed relative to the tumour, so this is an argument from the sizes
+and the scanning practice, not a measured miss rate.
+
+## Yet the glandular signal holds
+
+What we do measure is whether each beam went through **water-rich, glandular tissue** (@sec-water-rich, @sec-the-rule). When both breasts have at least one such
+scan, the CANCER breast is the wetter one in most CANCER/NORMAL patients, across the size range of @fig-tumour-sizes. Fatty scans of the same
+breasts do not carry the signal. So the result does not require the tumour in the beam; it requires glandular tissue.
+
+A working **hypothesis** is that the cancer changes tissue beyond the tumour itself — a **sphere of influence** — and that those changes are
+expressed in the glandular/fibrous tissue of the breast. Tumours remodel the fibrous stroma around them [[5]](#references), and X-ray scattering
+has detected structural changes in and next to breast tumours [[6]](#references) [[7]](#references). How far that region reaches cannot be measured
+from these data. What the data support is the practical claim: **high positioning accuracy on the tumour is not needed**; what matters is that each
+scan reaches glandular tissue.

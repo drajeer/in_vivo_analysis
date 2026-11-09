@@ -1,0 +1,527 @@
+# The water-peak filter in detail {#sec-glandular-details}
+
+```{python}
+#| include: false
+from cohort_common import *
+
+all_scans_results = rule_results(-np.inf, -np.inf)    # every scan used
+rule = rule_results(WATER_MIN, CENTRE_MIN)
+usable_share = np.mean([usable(h, c, WATER_MIN, CENTRE_MIN) for *_, h, c in scan_records])
+
+# how different a patient's two breasts are, whichever is which: |A − B| of their Water:Fat (curves already normalised)
+from scipy.stats import mannwhitneyu
+def breast_differences(min_height, min_centre, rejected=False):
+    """{comparison: [|A − B| of each patient's two breasts]}, with NORMAL vs NORMAL, and (left higher, NORMAL/NORMAL patients)."""
+    found = rule_breasts(min_height, min_centre, rejected=rejected)
+    out, left_higher, nn = defaultdict(list), 0, 0
+    for nova in sorted({n for n, _ in found if (n, "LEFT") in found and (n, "RIGHT") in found}):
+        (label_a, ratio_a, *_), (label_b, ratio_b, *_) = found[nova, "LEFT"], found[nova, "RIGHT"]
+        if not (np.isfinite(ratio_a) and np.isfinite(ratio_b)):
+            continue
+        difference = abs(ratio_a - ratio_b)
+        for comparison, (base, others) in COMPARISONS.items():
+            if (label_a == base and label_b in others) or (label_b == base and label_a in others):
+                out[comparison].append(difference)
+        if label_a == label_b == "NORMAL":
+            out["NORMAL vs NORMAL"].append(difference)
+            nn += 1; left_higher += ratio_a > ratio_b
+    return out, (left_higher, nn)
+
+differences_all, nn_all = breast_differences(-np.inf, -np.inf)
+differences_rule, nn_rule = breast_differences(WATER_MIN, CENTRE_MIN)
+rejected_results = rule_results(WATER_MIN, CENTRE_MIN, rejected=True)  # only the scans the rule rejects
+differences_rejected, nn_rejected = breast_differences(WATER_MIN, CENTRE_MIN, rejected=True)
+
+def median_difference(differences, comparison):
+    values = differences.get(comparison, [])
+    return f"{np.median(values):.2f}" if values else "–"
+
+def nn_text(counts):
+    higher, total = counts
+    return f"{higher}/{total} ({higher / total:.0%})" if total else "no patients"
+
+difference_p = {name: mannwhitneyu(d["CANCER vs NORMAL"], d["NORMAL vs NORMAL"], alternative="greater").pvalue
+                for name, d in (("all", differences_all), ("rule", differences_rule))}
+```
+
+The supporting analysis for the water-peak rule of @sec-the-rule: how the result depends on the threshold, how different the two breasts are, what
+the scans look like by age, and which patients the rule leaves out.
+
+## Every scan against usable scans, and the threshold
+
+```{python}
+#| label: fig-on-the-fly
+#| fig-cap: "**Left**: the share of patients whose first-named breast has the higher Water:Fat, using every scan (grey) and using only the scans the rule accepts, with both breasts usable (blue), with the number of patients and the two-sided binomial p-value against 50%. **Right**: the CANCER vs NORMAL result for water peak thresholds from 0 to 0.6 (the water centre rule unchanged), with the patients compared written at every 0.1; the grey line is every scan and the dashed line the chosen threshold."
+SMOOTH = np.round(np.arange(0, 0.601, 0.05), 2)  # thresholds for the sensitivity curve; above 0.6 too few patients are left
+sensitivity = {t: rule_results(t, CENTRE_MIN)["CANCER vs NORMAL"] for t in SMOOTH}
+
+def plot_sensitivity(ax, by_threshold, every_scan):
+    """The CANCER vs NORMAL share against the threshold, with the number of patients written at every 0.1."""
+    ts = np.array(list(by_threshold))
+    shares = [100 * h / n if n else np.nan for h, n, _ in by_threshold.values()]
+    ax.plot(ts, shares, color=ne.STATUS_COLOURS["CANCER"], lw=1.8, marker="o", ms=3, label="usable scans, both breasts")
+    for t, (h, n, _) in by_threshold.items():
+        if n and round(t * 10) == t * 10:
+            ax.text(t, 100 * h / n + 3, f"{h}/{n}", ha="center", fontsize=6)
+    h, n, _ = every_scan
+    ax.axhline(100 * h / n, color="grey", lw=1, label=f"every scan, {h}/{n}")
+    ax.axhline(50, color="black", ls=":", lw=1, label="chance")
+    ax.axvline(WATER_MIN, color="black", ls="--", lw=1, label=f"chosen threshold, {WATER_MIN:g}")
+    ax.set(xlabel="minimum water peak of a usable scan (fraction of the fat peak)", ylabel="CANCER vs NORMAL: CANCER breast higher (%)",
+           ylim=(0, 110), xlim=(-0.02, SMOOTH[-1] + 0.02))
+    ax.grid(alpha=0.3)
+    ax.legend(frameon=False, loc="lower left", fontsize=6)
+plt.rcParams["font.size"] = 7  # small text so both panels fit side by side on an A4 page
+fig, (bar_ax, sens_ax) = plt.subplots(1, 2, figsize=(8, 4))
+for ax in (bar_ax, sens_ax):
+    ax.set_box_aspect(1)  # square panels
+width = 0.38
+for k, comparison in enumerate(COMPARISONS):
+    for offset, results, colour, name in ((-width / 2, all_scans_results, "lightgrey", "every scan"),
+                                          (width / 2, rule, TOP_COLOUR, "usable scans only, both breasts")):
+        higher, total, p_value = results[comparison]
+        if not total:
+            continue
+        bar_ax.bar(k + offset, 100 * higher / total, width=width, color=colour, label=name if k == 0 else None)
+        bar_ax.text(k + offset, 100 * higher / total + 2, f"{higher}/{total}\np={p_value:.2g}", ha="center", va="bottom", fontsize=5)
+bar_ax.axhline(50, color="black", ls=":", lw=1)
+bar_ax.text(len(COMPARISONS) - 0.5, 51, "chance ", ha="right", va="bottom", fontsize=6)
+bar_ax.set(xticks=range(len(COMPARISONS)), ylim=(0, 115), yticks=range(0, 101, 20),
+           ylabel="patients whose first-named breast\nhas the higher Water:Fat (%)")
+bar_ax.set_xticklabels([c.replace(" vs ", "\nvs ") for c in COMPARISONS], fontsize=6)
+bar_ax.grid(alpha=0.3, axis="y")
+bar_ax.legend(frameon=False, loc="upper center", bbox_to_anchor=(0.5, -0.14), ncols=1, fontsize=6)
+
+plot_sensitivity(sens_ax, sensitivity, all_scans_results["CANCER vs NORMAL"])
+fig.tight_layout()
+plt.show()
+plt.rcParams["font.size"] = 10
+```
+
+**How much depends on the threshold?** The right of @fig-on-the-fly repeats the CANCER vs NORMAL comparison for other thresholds. The result moves
+around from one threshold to the next, partly because the number of patients falls as the threshold rises; a single threshold should not be read too precisely.
+
+## How different the two breasts are
+
+```{python}
+#| label: fig-differences
+#| fig-cap: "Each patient's two breasts compared, using only the usable scans (blue) or only the rejected scans (grey); one dot per patient. **Left**: the signed difference, first-named − second (CANCER − NORMAL, etc.; NORMAL vs NORMAL is LEFT − RIGHT); above 0, the first-named breast has more water. **Right**: |A − B|, which does not need to know which breast is which. Boxes span the middle half of the patients, the thick line is the median, and the whiskers reach the furthest patient within 1.5 box-lengths."
+def signed_differences(min_height, min_centre, rejected=False):
+    """{comparison: [first-named − second Water:Fat per patient]}, and {"NORMAL vs NORMAL": [left − right]}."""
+    found = rule_breasts(min_height, min_centre, rejected=rejected)
+    out = defaultdict(list)
+    for nova in sorted({n for n, _ in found if (n, "LEFT") in found and (n, "RIGHT") in found}):
+        (label_a, ratio_a, *_), (label_b, ratio_b, *_) = found[nova, "LEFT"], found[nova, "RIGHT"]
+        if not (np.isfinite(ratio_a) and np.isfinite(ratio_b)):
+            continue
+        for comparison, (base, others) in COMPARISONS.items():
+            if label_a == base and label_b in others:
+                out[comparison].append(ratio_b - ratio_a)
+            elif label_b == base and label_a in others:
+                out[comparison].append(ratio_a - ratio_b)
+        if label_a == label_b == "NORMAL":
+            out["NORMAL vs NORMAL"].append(ratio_a - ratio_b)
+    return out
+
+signed_rule = signed_differences(WATER_MIN, CENTRE_MIN)
+signed_rejected = signed_differences(WATER_MIN, CENTRE_MIN, rejected=True)
+
+rng = np.random.default_rng(1)
+plt.rcParams["font.size"] = 7  # small text so both panels fit side by side on an A4 page
+fig, (signed_ax, size_ax) = plt.subplots(1, 2, figsize=(8, 4.2))
+for ax in (signed_ax, size_ax):
+    ax.set_box_aspect(1)  # square panels
+names_signed = list(COMPARISONS) + ["NORMAL vs NORMAL"]  # NN is LEFT − RIGHT
+names_size = list(COMPARISONS) + ["NORMAL vs NORMAL"]
+for ax, names_here, transform in ((signed_ax, names_signed, lambda v: v), (size_ax, names_size, lambda v: [abs(x) for x in v])):
+    groups = []
+    for k, name in enumerate(names_here):
+        groups.append((k - 0.2, transform(signed_rule.get(name, [])), USABLE_COLOUR))
+        groups.append((k + 0.2, transform(signed_rejected.get(name, [])), REJECTED_COLOUR))
+    box_with_points(ax, groups, rng)
+    ax.set_xticks(range(len(names_here)))
+    ax.set_xticklabels([f"{n.replace(' vs ', chr(10) + 'vs ')}\n(n = {len(signed_rule.get(n, []))} / {len(signed_rejected.get(n, []))})" for n in names_here], fontsize=6)
+    ax.grid(alpha=0.3, axis="y")
+signed_ax.axhline(0, color="black", lw=1)
+signed_ax.set(ylabel="first-named − second, Water:Fat", title="Which breast has more water")
+size_ax.set(ylabel="|A − B|, Water:Fat", title="How different the two breasts are", ylim=(0, None))
+from matplotlib.patches import Patch
+signed_ax.legend(handles=[Patch(color=USABLE_COLOUR, alpha=0.5, label="usable scans"), Patch(color=REJECTED_COLOUR, alpha=0.5, label="rejected scans")],
+                 frameon=False, loc="upper center", bbox_to_anchor=(1.1, -0.2), ncols=2, fontsize=6)
+fig.tight_layout()
+plt.show()
+plt.rcParams["font.size"] = 10
+```
+
+The rule accepts `{python} f"{usable_share:.0%}"` of all scans. The results using **only the usable scans**:
+
+| Usable scans | First-named breast higher | Median difference between the breasts, \|A − B\| |
+|---|---|---|
+| CANCER vs NORMAL | **`{python} rule_text(rule, "CANCER vs NORMAL")`** | `{python} median_difference(differences_rule, "CANCER vs NORMAL")` |
+| BENIGN vs NORMAL | **`{python} rule_text(rule, "BENIGN vs NORMAL")`** | `{python} median_difference(differences_rule, "BENIGN vs NORMAL")` |
+| CANCER vs BENIGN | **`{python} rule_text(rule, "CANCER vs BENIGN")`** | `{python} median_difference(differences_rule, "CANCER vs BENIGN")` |
+| **NORMAL vs NORMAL** | – | **`{python} median_difference(differences_rule, "NORMAL vs NORMAL")`** (`{python} nn_rule[1]` patients) |
+
+and the same comparisons using **only the scans the rule rejects**, the other `{python} f"{1 - usable_share:.0%}"` (each breast is the mean of its
+rejected scans, and a patient is compared only if both breasts have one):
+
+| Rejected scans | First-named breast higher | Median difference between the breasts, \|A − B\| |
+|---|---|---|
+| CANCER vs NORMAL | **`{python} rule_text(rejected_results, "CANCER vs NORMAL")`** | `{python} median_difference(differences_rejected, "CANCER vs NORMAL")` |
+| BENIGN vs NORMAL | **`{python} rule_text(rejected_results, "BENIGN vs NORMAL")`** | `{python} median_difference(differences_rejected, "BENIGN vs NORMAL")` |
+| CANCER vs BENIGN | **`{python} rule_text(rejected_results, "CANCER vs BENIGN")`** | `{python} median_difference(differences_rejected, "CANCER vs BENIGN")` |
+| **NORMAL vs NORMAL** | – | **`{python} median_difference(differences_rejected, "NORMAL vs NORMAL")`** (`{python} nn_rejected[1]` patients) |
+
+The **difference between the breasts** is |A − B| of the two breasts' Water:Fat, the median over the patients in each row. Because every curve is
+already normalised so its fat peak is 1, the absolute gap has a direct meaning and needs no further scaling. It does not need to know which breast
+is which, so it is what a blind measurement would see. **NORMAL vs NORMAL** is the baseline: how different two healthy breasts of the same patient
+are. If a cancer is to be spotted blind, a CANCER/NORMAL pair has to differ by clearly more than that.
+
+From the usable scans, the CANCER breast is the higher in **`{python} rule_text(rule, "CANCER vs NORMAL")`** of CANCER/NORMAL patients, and the two
+breasts differ by a median of **`{python} median_difference(differences_rule, "CANCER vs NORMAL")`**. From the rejected, fatty scans it is the higher
+in only **`{python} rule_text(rejected_results, "CANCER vs NORMAL")`**, about what chance would give, and the breasts differ by
+**`{python} median_difference(differences_rejected, "CANCER vs NORMAL")`**, close to the **`{python} median_difference(differences_rejected, "NORMAL vs NORMAL")`**
+of two NORMAL breasts. Fatty scans cannot tell a CANCER breast from a NORMAL one; the information is in the water-rich scans. The NORMAL vs NORMAL
+baseline is thin, though: `{python} nn_rule[1]` patients have two NORMAL breasts with usable scans and `{python} nn_rejected[1]` with rejected scans.
+
+## Usable and rejected scans by age {#sec-usable-and-rejected-scans-by-age}
+
+Breasts are averaged within each age band, separately for NORMAL, BENIGN and CANCER, twice: once using only the scans that pass the test
+(usable), and once using only the scans it rejects. In each, a breast is the mean of the scans used. This shows what the kept and the
+discarded scans look like at different ages.
+
+```{python}
+#| include: false
+AGE_BANDS = ((0, 40, "under 40"), (40, 50, "40–49"), (50, np.inf, "50 and over"))
+BAND_NAMES = [name for *_, name in AGE_BANDS]
+
+def band_summary(breasts):
+    """{label: {band: (mean curve, SD curve, breasts)}} for breasts {(nova, side, label): [curves]} whose patient has an age."""
+    grouped = {lab: {name: [] for name in BAND_NAMES} for lab in COHORTS}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        for (nova, side, label), curves in breasts.items():
+            for low, high, name in AGE_BANDS:
+                if nova in nova_age and low <= nova_age[nova] < high:
+                    grouped[label][name].append(np.nanmean(curves, axis=0))
+        return {lab: {name: (np.nanmean(c, axis=0), np.nanstd(c, axis=0), len(c)) for name, c in by_band.items() if c}
+                for lab, by_band in grouped.items()}
+
+summaries = {"usable": band_summary(breast_use), "rejected": band_summary(breast_rej)}
+
+# one q range and one y range for both figures, so they can be compared
+stack = np.vstack([mean for s in summaries.values() for by_band in s.values() for mean, _, _ in by_band.values()])
+covered = np.flatnonzero(np.isfinite(stack).all(axis=0))
+columns = slice(covered[0], covered[-1] + 1)
+y_top = 1.05 * max(np.nanmax((mean + sd)[columns]) for s in summaries.values() for by_band in s.values()
+                   for mean, sd, _ in by_band.values())
+
+def plot_bands(summary):
+    plt.rcParams["font.size"] = 7
+    fig, axes = plt.subplots(1, 3, figsize=(8, 3.4), sharey=True)
+    for ax, name in zip(axes, BAND_NAMES):
+        ax.set_box_aspect(1)
+        for label in COHORTS:
+            if name not in summary[label]:
+                continue
+            mean, sd, n = summary[label][name]
+            colour = ne.STATUS_COLOURS[label]
+            ax.fill_between(q[columns], (mean - sd)[columns], (mean + sd)[columns], color=colour, alpha=0.15, lw=0)
+            ax.plot(q[columns], mean[columns], color=colour, lw=1.6, label=f"{label}: {n} breasts")
+        ax.hlines(WATER_MIN, *WATER, color="black", ls="--", lw=1.2)
+        ax.axvline(14, color="black", ls=":", lw=0.8)
+        ax.set(title=f"Age {name}", xlabel="q (nm⁻¹)", xlim=(2, q[columns][-1]), ylim=(0, y_top))
+        ax.set_xticks([5, 10, 15, 20])
+        ax.grid(alpha=0.3)
+        ax.legend(frameon=False, loc="upper right", fontsize=5.5)
+    axes[0].set_ylabel("I(q), stretched")
+    fig.tight_layout()
+    plt.show()
+    plt.rcParams["font.size"] = 10
+
+def water_height(kind, label, name):
+    if name not in summaries[kind][label]:
+        return "–"
+    mean, _, n = summaries[kind][label][name]
+    return f"{np.nanmean(mean[(q >= WATER[0]) & (q <= WATER[1])]):.2f} ({n})"
+
+def cell_height(kind, label, name):
+    mean, _, _ = summaries[kind][label][name]
+    return float(np.nanmean(mean[(q >= WATER[0]) & (q <= WATER[1])]))
+
+cell_values = [cell_height(kind, label, name) for label in COHORTS for kind in summaries for name in BAND_NAMES]
+cell_norm = plt.Normalize(np.nanmin(cell_values), np.nanmax(cell_values))
+
+def cell_style(value):
+    """The cell's colour on the heatmaps' scale (yellow high, dark blue low), with text that stays readable on it."""
+    rgb = cmap(cell_norm(value))[:3]
+    text = "black" if 0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2] > 0.5 else "white"
+    return f"background-color: {plt.matplotlib.colors.to_hex(rgb)}; color: {text}"
+
+water_table = "\n".join(
+    ["<table class='table'>", "<thead><tr><th>Cohort</th><th>Scans used</th>" + "".join(f"<th>{name}</th>" for name in BAND_NAMES) + "</tr></thead><tbody>"]
+    + [f"<tr><td>{label}</td><td>{kind}</td>"
+       + "".join(f"<td style='{cell_style(cell_height(kind, label, name))}'>{water_height(kind, label, name)}</td>" for name in BAND_NAMES) + "</tr>"
+       for label in COHORTS for kind in summaries]
+    + ["</tbody></table>"])
+```
+
+```{python}
+#| label: fig-usable-by-age
+#| fig-cap: "**Usable scans.** Mean prepared curve of NORMAL, BENIGN and CANCER breasts, one panel per age band (each breast is the mean of its usable scans), with ±1 SD across breasts shaded. The dashed line is the usable-scan water threshold over q 20–22."
+plot_bands(summaries["usable"])
+```
+
+```{python}
+#| label: fig-rejected-by-age
+#| fig-cap: "**Rejected scans.** As @fig-usable-by-age, but each breast is the mean of the scans the test rejects."
+plot_bands(summaries["rejected"])
+```
+
+The table below sums this up: the mean water peak height (q 20–22) of each band's mean curve, with the number of breasts in brackets, each cell
+coloured on the heatmaps' scale (yellow high, dark blue low):
+
+```{python}
+#| echo: false
+#| output: asis
+print(water_table)
+```
+
+Breasts without an age are left out, and both figures share one y axis. The rejected scans look the same at every age and in every cohort, with
+a water peak near 0.2: once the water-bearing scans are taken out, what is left is fat, whatever the patient's age or label. The usable scans
+fall only a little with age, and CANCER stays about level while NORMAL and BENIGN drop, so in the older bands CANCER is the wettest. Only
+`{python} summaries['usable']['CANCER']['under 40'][2]` CANCER breasts are under 40, so those curves say little.
+
+## Water peak against age
+
+@fig-usable-normal checks whether water peak height among **all usable** breasts is linked to age — NORMAL, BENIGN and CANCER on one axes, each in its cohort colour. One point per breast; a least-squares line and Spearman ρ per label.
+
+```{python}
+#| label: fig-usable-normal
+#| fig-cap: "All usable breasts: water peak height (mean over q 20–22 of the breast's usable-scan mean) against patient age. Points coloured by label; solid line is ordinary least squares within that label; dashed line is the usable-scan water threshold."
+import h5py
+from scipy.stats import spearmanr
+
+# age is stored per scan in the HDF5; one value per Nova
+_nova_age = {}
+with h5py.File(ne.STORE_PATH, "r") as _store:
+    for _group in _store["scans"].values():
+        _nova = int(_group.attrs["nova"])
+        _age = float(_group.attrs.get("age", np.nan))
+        if np.isfinite(_age):
+            _nova_age[_nova] = _age
+
+def _age_water_points(label):
+    ages, waters = [], []
+    for (nova, side, lab), curves in breast_use.items():
+        if lab != label or nova not in _nova_age:
+            continue
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)
+            mean_curve = np.nanmean(curves, axis=0)
+            water_h = float(np.nanmean(mean_curve[(q >= WATER[0]) & (q <= WATER[1])]))
+        if not np.isfinite(water_h):
+            continue
+        ages.append(_nova_age[nova])
+        waters.append(water_h)
+    return np.asarray(ages, float), np.asarray(waters, float)
+
+_age_water_by_label = {lab: _age_water_points(lab) for lab in COHORTS}
+_age_water_stats = {lab: spearmanr(ages, waters) for lab, (ages, waters) in _age_water_by_label.items()
+                    if len(ages) >= 2}
+
+plt.rcParams["font.size"] = 7
+fig, ax = plt.subplots(figsize=(4.8, 3.8))
+ax.set_box_aspect(1)
+for label in COHORTS:
+    ages, waters = _age_water_by_label[label]
+    if len(ages) < 2:
+        continue
+    rho, p_val = _age_water_stats[label]
+    colour = ne.STATUS_COLOURS[label]
+    ax.scatter(ages, waters, s=18, color=colour, alpha=0.75, lw=0, zorder=3,
+               label=f"{label} (n = {len(ages)}, ρ = {rho:.2f})")
+    fit = np.polyfit(ages, waters, 1)
+    line_x = np.linspace(ages.min(), ages.max(), 50)
+    ax.plot(line_x, np.polyval(fit, line_x), color=colour, lw=1.4, zorder=2)
+ax.axhline(WATER_MIN, color="black", lw=1, alpha=0.45, ls="--")
+ax.set(title="Usable breasts: water peak vs age",
+       xlabel="Age (years)", ylabel="Water peak height (q 20–22)")
+ax.grid(alpha=0.3)
+ax.legend(frameon=False, loc="upper right", fontsize=6)
+fig.tight_layout()
+plt.show()
+plt.rcParams["font.size"] = 10
+```
+
+In every usable cohort the link runs the same way — **older → lower water peak (fattier)** — Spearman ρ = `{python} f"{_age_water_stats['NORMAL'].statistic:.2f}"` NORMAL (p = `{python} f"{_age_water_stats['NORMAL'].pvalue:.2g}"`), `{python} f"{_age_water_stats['BENIGN'].statistic:.2f}"` BENIGN (p = `{python} f"{_age_water_stats['BENIGN'].pvalue:.2g}"`), `{python} f"{_age_water_stats['CANCER'].statistic:.2f}"` CANCER (p = `{python} f"{_age_water_stats['CANCER'].pvalue:.2g}"`).
+
+## Who the rule leaves out
+
+```{python}
+#| echo: false
+import re
+from scipy.stats import fisher_exact, mannwhitneyu
+from clinical import *
+
+age_p = mannwhitneyu(group_ages["compared"], group_ages["left out"]).pvalue
+
+def term_share(pattern):
+    """(share of compared patients, share of left-out patients, Fisher p) whose records match pattern."""
+    hits = {g: sum(bool(re.search(pattern, clinical_text[n])) for n in v) for g, v in rule_groups.items()}
+    sizes = {g: len(v) for g, v in rule_groups.items()}
+    p = fisher_exact([[hits["compared"], sizes["compared"] - hits["compared"]], [hits["left out"], sizes["left out"] - hits["left out"]]])[1]
+    return hits["compared"] / sizes["compared"], hits["left out"] / sizes["left out"], p
+
+TERMS = {"“scattered areas of fibroglandular density” (mostly fatty)": "scattered areas of fibroglandular",
+         "“dense” (any)": r"\bdense", "“extremely dense”": "extremely dense", "“palpable”": "palpable",
+         "“screening (asymptomatic)”": r"screen\w* \(asymptomatic", "“calcification”": "calcification",
+         "“carcinoma”": "carcinom", "“mastitis”": "mastitis", "“family history”": "family history"}
+term_rows = {name: term_share(pattern) for name, pattern in TERMS.items()}
+pct = lambda x: f"{x:.0%}"
+```
+
+Who are the patients the rule cannot compare? Of the `{python} len(scanned_both)` patients with both breasts scanned (NORMAL, BENIGN or
+CANCER), the rule compares **`{python} len(rule_groups["compared"])`** and leaves out **`{python} len(rule_groups["left out"])`**:
+`{python} left_out_one` with one breast without a usable scan and `{python} left_out_both` with neither. The pathology and radiology sheets in
+`Images/` were searched for each patient, independently of the scattering data.
+
+```{python}
+#| label: fig-who-left-out
+#| fig-cap: "Patients the rule compares (blue) and leaves out (grey). **Left**: BI-RADS breast density, the category the radiology reports mention most often for each patient. **Right**: age, where the sheets give it; one dot per patient."
+plt.rcParams["font.size"] = 7
+fig, (density_ax, age_ax) = plt.subplots(1, 2, figsize=(8, 4.6))
+for ax in (density_ax, age_ax):
+    ax.set_box_aspect(1)
+width = 0.38
+for offset, group, colour in ((-width / 2, "compared", USABLE_COLOUR), (width / 2, "left out", REJECTED_COLOUR)):
+    shares = [100 * density_share[group][c] for c in DENSITY_ORDER]
+    density_ax.bar(np.arange(len(DENSITY_ORDER)) + offset, shares, width=width, color=colour, alpha=0.75,
+                   label=f"{group} ({len(rule_groups[group])} patients)")
+    for k, s in enumerate(shares):
+        density_ax.text(k + offset, s + 1, f"{s:.0f}", ha="center", va="bottom", fontsize=5.5)
+density_ax.set_xticks(range(len(DENSITY_ORDER)))
+density_ax.set_xticklabels(DENSITY_ORDER, fontsize=5.5, rotation=35, ha="right", rotation_mode="anchor")
+density_ax.set(ylabel="patients (%)", title="Breast density in the radiology reports", ylim=(0, 80))
+density_ax.grid(alpha=0.3, axis="y")
+density_ax.legend(frameon=False, fontsize=6, loc="upper left")
+box_with_points(age_ax, [(0, group_ages["compared"], USABLE_COLOUR), (1, group_ages["left out"], REJECTED_COLOUR)], np.random.default_rng(2))
+age_ax.set_xticks([0, 1])
+age_ax.set_xticklabels([f"compared\n(n = {len(group_ages['compared'])})", f"left out\n(n = {len(group_ages['left out'])})"])
+age_ax.set(ylabel="age (years)", title=f"Age (Mann-Whitney p = {age_p:.1g})")
+age_ax.grid(alpha=0.3, axis="y")
+fig.tight_layout()
+plt.show()
+plt.rcParams["font.size"] = 10
+```
+
+The pattern is clear (@fig-who-left-out): **the rule leaves out the fatty breasts.** Radiologists describe a mostly fatty breast as having
+“scattered areas of fibroglandular density” (BI-RADS B); that is the main description for
+**`{python} pct(density_share["left out"]["B: scattered fibroglandular"])`** of the patients left out but only
+**`{python} pct(density_share["compared"]["B: scattered fibroglandular"])`** of those compared. The patients compared are mostly heterogeneously or
+extremely dense (BI-RADS C/D: `{python} pct(density_share["compared"]["C: heterogeneously dense"] + density_share["compared"]["D: extremely dense"])`,
+against `{python} pct(density_share["left out"]["C: heterogeneously dense"] + density_share["left out"]["D: extremely dense"])` of those left out).
+They are also younger, median **`{python} f"{np.median(group_ages['compared']):.0f}"`** against **`{python} f"{np.median(group_ages['left out']):.0f}"`**
+years, as expected since breasts become fattier with age.
+
+| Mentioned in the patient's records | Compared | Left out | p (Fisher) |
+|---|---|---|---|
+| `{python} list(term_rows)[0]` | `{python} pct(term_rows[list(term_rows)[0]][0])` | `{python} pct(term_rows[list(term_rows)[0]][1])` | `{python} f"{term_rows[list(term_rows)[0]][2]:.1g}"` |
+| `{python} list(term_rows)[1]` | `{python} pct(term_rows[list(term_rows)[1]][0])` | `{python} pct(term_rows[list(term_rows)[1]][1])` | `{python} f"{term_rows[list(term_rows)[1]][2]:.1g}"` |
+| `{python} list(term_rows)[2]` | `{python} pct(term_rows[list(term_rows)[2]][0])` | `{python} pct(term_rows[list(term_rows)[2]][1])` | `{python} f"{term_rows[list(term_rows)[2]][2]:.1g}"` |
+| `{python} list(term_rows)[3]` | `{python} pct(term_rows[list(term_rows)[3]][0])` | `{python} pct(term_rows[list(term_rows)[3]][1])` | `{python} f"{term_rows[list(term_rows)[3]][2]:.1g}"` |
+| `{python} list(term_rows)[4]` | `{python} pct(term_rows[list(term_rows)[4]][0])` | `{python} pct(term_rows[list(term_rows)[4]][1])` | `{python} f"{term_rows[list(term_rows)[4]][2]:.1g}"` |
+| `{python} list(term_rows)[5]` | `{python} pct(term_rows[list(term_rows)[5]][0])` | `{python} pct(term_rows[list(term_rows)[5]][1])` | `{python} f"{term_rows[list(term_rows)[5]][2]:.1g}"` |
+| `{python} list(term_rows)[6]` | `{python} pct(term_rows[list(term_rows)[6]][0])` | `{python} pct(term_rows[list(term_rows)[6]][1])` | `{python} f"{term_rows[list(term_rows)[6]][2]:.1g}"` |
+| `{python} list(term_rows)[7]` | `{python} pct(term_rows[list(term_rows)[7]][0])` | `{python} pct(term_rows[list(term_rows)[7]][1])` | `{python} f"{term_rows[list(term_rows)[7]][2]:.1g}"` |
+| `{python} list(term_rows)[8]` | `{python} pct(term_rows[list(term_rows)[8]][0])` | `{python} pct(term_rows[list(term_rows)[8]][1])` | `{python} f"{term_rows[list(term_rows)[8]][2]:.1g}"` |
+
+Patients who came in with a palpable lump, often younger women with dense breasts, are more often compared; routine screening patients lean
+towards being left out. Mastitis and family history make no clear difference.
+
+::: {.callout-note title="What this means"}
+1. **The rule is, in effect, a breast-density filter.** Its scan-by-scan water-peak check, which never sees the clinical records, keeps mostly
+   BI-RADS C/D breasts and drops mostly B. This confirms from independent records that rejected scans come from fatty tissue, not from bad
+   measurements.
+2. **This is where it would be most useful.** Dense breasts are where mammography is weakest (the reports here repeatedly say density “may obscure
+   small masses”), so a method that works in dense breasts would complement it.
+3. **It narrows who the result applies to.** The CANCER vs NORMAL result of the rule holds for younger women with dense breasts; for the older,
+   fattier group it currently says nothing.
+4. **Age cannot bias the comparison itself**: both breasts of a patient have the same age, so age decides only *who* is compared, not which
+   breast comes out higher.
+:::
+
+### Is it just the odds of hitting glandular tissue?
+
+```{python}
+#| echo: false
+# each breast's scans: usable or not
+breast_scans = defaultdict(list)
+for nova, side, label, curve, height, centre in scan_records:
+    if label in COHORTS:
+        breast_scans[nova, side].append(usable(height, centre, WATER_MIN, CENTRE_MIN))
+
+def hit_model(novas_here):
+    """Per-scan chance p of a usable scan; the share of patients with both breasts usable, predicted if every scan were an independent
+    try with chance p (1 − (1 − p)^k per breast of k scans) and observed; and the share of breasts with a mix of usable and rejected scans,
+    predicted (1 − p^k − (1 − p)^k) and observed."""
+    sides = [breast_scans[n, s] for n in novas_here for s in ("LEFT", "RIGHT")]
+    p = np.mean([u for scans_here in sides for u in scans_here])
+    both_predicted = np.mean([np.prod([1 - (1 - p) ** len(breast_scans[n, s]) for s in ("LEFT", "RIGHT")]) for n in novas_here])
+    both_observed = np.mean([all(any(breast_scans[n, s]) for s in ("LEFT", "RIGHT")) for n in novas_here])
+    mixed_predicted = np.mean([1 - p ** len(x) - (1 - p) ** len(x) for x in sides])
+    mixed_observed = np.mean([0 < sum(x) < len(x) for x in sides])
+    return dict(n=len(novas_here), p=p, both_predicted=both_predicted, both_observed=both_observed,
+                mixed_predicted=mixed_predicted, mixed_observed=mixed_observed)
+
+by_density = {c: hit_model([n for n in scanned_both if patient_density.get(n, "not stated") == c])
+              for c in DENSITY_ORDER if any(patient_density.get(n, "not stated") == c for n in scanned_both)}
+
+def scan_hit_rate(novas_here):
+    values = [u for n in novas_here for s in ("LEFT", "RIGHT") for u in breast_scans[n, s]]
+    return (np.mean(values) if values else np.nan), len(novas_here)
+AGE_SPLIT = 50
+by_age = {c: {band: scan_hit_rate([n for n in scanned_both if patient_density.get(n) == c and n in patient_age
+                                   and (patient_age[n] < AGE_SPLIT) == (band == "younger")]) for band in ("younger", "older")}
+          for c in ("B: scattered fibroglandular", "C: heterogeneously dense")}
+
+def density_row(c):
+    m = by_density[c]
+    return f"| {c} | {m['n']} | {m['p']:.0%} | {m['both_observed']:.0%} | {m['mixed_observed']:.0%} |"
+density_table = "\n".join(["| Density | Patients | Scans usable | Patients with both breasts usable | Breasts whose scans disagree |",
+                           "|---|---|---|---|---|"] + [density_row(c) for c in by_density])
+age_table = "\n".join([f"| Density | Chance a scan is usable, age < {AGE_SPLIT} | age ≥ {AGE_SPLIT} |", "|---|---|---|"]
+                      + [f"| {c} | {by_age[c]['younger'][0]:.0%} ({by_age[c]['younger'][1]} patients) | "
+                         f"{by_age[c]['older'][0]:.0%} ({by_age[c]['older'][1]} patients) |" for c in by_age])
+```
+
+A dense breast holds more glandular tissue, so a scan placed anywhere in it is more likely to pass through some. The table shows, for each
+density, how often a scan is usable, how often a patient ends up with both breasts usable, and how often a breast's scans disagree (some usable,
+some rejected):
+
+```{python}
+#| echo: false
+#| output: asis
+print(density_table)
+```
+
+**Density sets the odds.** A single scan is usable in `{python} f"{by_density['B: scattered fibroglandular']['p']:.0%}"` of cases in mostly
+fatty (B) breasts and `{python} f"{by_density['D: extremely dense']['p']:.0%}"` in extremely dense (D) ones. That is why the rule leaves out
+the fatty breasts.
+
+**A breast's scans usually agree.** Most breasts give all usable or all rejected scans. If each scan were an independent coin flip, about
+`{python} f"{by_density['C: heterogeneously dense']['mixed_predicted']:.0%}"` of C breasts would have a mix; only
+`{python} f"{by_density['C: heterogeneously dense']['mixed_observed']:.0%}"` do. The scans are taken close together and sample the same region,
+so if a scan misses, moving to a clearly different spot should help more than repeating nearby.
+
+**Age matters even at the same density:**
+
+```{python}
+#| echo: false
+#| output: asis
+print(age_table)
+```
+
+Within the same BI-RADS category, younger patients' scans are usable two to four times as often. Either BI-RADS, a coarse four-step scale, hides real
+differences in density, or glandular tissue itself holds less water with age (it involutes after menopause, with fewer cells and more collagen),
+so even a scan that does hit it may not show a water peak above the threshold. This data cannot separate the two, and the groups are small.

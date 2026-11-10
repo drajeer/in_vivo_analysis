@@ -180,6 +180,30 @@ plt.rcParams["font.size"] = 10
 Mapping gives a **whole-breast analysis**: we can tell the adipose and glandular areas apart, analyse them separately if we want, and get an
 idea of **where** interesting tissue is — on the hypothesis of a tumour sphere of influence (@sec-tumour) — without aiming at the tumour or deciding at the instrument.
 
+## What a whole-breast map would let us measure {#sec-map-measures}
+
+With about three points per breast we get one noisy Water:Fat number, so we can only ask whether the mean is higher in the CANCER breast. A map of
+around 100 points per breast gives a **distribution** per breast. That supports several readouts (proposal only, not results):
+
+- **Wettest region.** A high quantile, or the mean of the wettest N points (not the single maximum), compared left against right.
+- **Fattiest region as baseline.** Finding 1 says the fattiest `{python} PART`% look the same across cohorts, so this is a within-patient
+  control, not a discriminator: thickness, calibration and density offsets cancel. Wettest minus fattiest (or their ratio) is a natural
+  per-patient measure.
+- **Mean Water:Fat** per breast, left against right (paired, so it controls for the patient).
+- **Variance of Water:Fat** per breast, left against right. Correct for counting noise from neighbour-point differences (about
+  `{python} f"{point_noise:.2f}"` on the Ulster map), and report a coefficient of variation or work on the log ratio, because variance scales
+  with the mean. Mask edge and thin points.
+- **Comparison to a "normal" reference** (mean or variance) is deferred: it needs a healthy-volunteer cohort, and normal varies with density,
+  age and menopausal status.
+
+A map can separate a **global** effect (the mean shifts), a **local** effect (the wet tail grows) and a **heterogeneity** effect (the variance
+changes). Single-point scans cannot. It also gives internal controls, several independent readouts, and spatial information on where the wet
+tissue is, which ties to the tumour sphere-of-influence idea in Chapter 3 (@sec-tumour).
+
+For a small pilot, pre-specify one **primary** endpoint (wettest region, left against right) and treat the rest as secondary or exploratory, to
+avoid multiple-comparison problems. Points within a breast are spatially correlated, so analyse at breast or patient level, not as 100
+independent samples. Prefer comparing whole distributions (for example several quantiles) over relying on a single summary number.
+
 ## How long would a whole-breast map take?
 
 The practical picture is a **continuous fly-scan**, not a stop-and-dwell grid. The detector runs at **1 Hz**, and the source and detector move

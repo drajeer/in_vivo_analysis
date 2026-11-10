@@ -30,6 +30,10 @@ format:
     code-fold: true
     include-in-header:
       text: "<style>@media print { img { max-width: 100% !important; height: auto !important; } } img.figure-img { max-width: 100% !important; height: auto !important; } .cell-output-display { overflow-x: visible !important; } .headroom--unpinned { transform: none !important; top: 0 !important; }</style>"
+  pdf:
+    toc: false
+    echo: false
+    warning: false
 
 jupyter: xrdanalysis
 

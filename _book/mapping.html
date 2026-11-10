@@ -71,7 +71,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="site_libs/quarto-search/fuse.min.js"></script>
 <script src="site_libs/quarto-search/quarto-search.js"></script>
 <meta name="quarto:offset" content="./">
-<link href="./limitations.html" rel="next">
+<link href="./simulation.html" rel="next">
 <link href="./tumour.html" rel="prev">
 <script src="site_libs/quarto-html/quarto.js" type="module"></script>
 <script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
@@ -182,14 +182,20 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </li>
         <li class="sidebar-item">
   <div class="sidebar-item-container"> 
+  <a href="./simulation.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">5</span>&nbsp; <span class="chapter-title">Simulating a Human 2.0 map</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
   <a href="./limitations.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text"><span class="chapter-number">5</span>&nbsp; <span class="chapter-title">Limitations</span></span></a>
+ <span class="menu-text"><span class="chapter-number">6</span>&nbsp; <span class="chapter-title">Limitations</span></span></a>
   </div>
 </li>
         <li class="sidebar-item">
   <div class="sidebar-item-container"> 
   <a href="./next_steps.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text"><span class="chapter-number">6</span>&nbsp; <span class="chapter-title">Next steps</span></span></a>
+ <span class="menu-text"><span class="chapter-number">7</span>&nbsp; <span class="chapter-title">Next steps</span></span></a>
   </div>
 </li>
         <li class="sidebar-item">
@@ -431,8 +437,21 @@ Figure&nbsp;4.3: Selecting regions after the scan. <strong>Left</strong>: the sa
 </div>
 <p>Mapping gives a <strong>whole-breast analysis</strong>: we can tell the adipose and glandular areas apart, analyse them separately if we want, and get an idea of <strong>where</strong> interesting tissue is — on the hypothesis of a tumour sphere of influence (<a href="tumour.html" class="quarto-xref"><span>Chapter 3</span></a>) — without aiming at the tumour or deciding at the instrument.</p>
 </section>
-<section id="how-long-would-a-whole-breast-map-take" class="level2" data-number="4.3">
-<h2 data-number="4.3" class="anchored" data-anchor-id="how-long-would-a-whole-breast-map-take"><span class="header-section-number">4.3</span> How long would a whole-breast map take?</h2>
+<section id="sec-map-measures" class="level2" data-number="4.3">
+<h2 data-number="4.3" class="anchored" data-anchor-id="sec-map-measures"><span class="header-section-number">4.3</span> What a whole-breast map would let us measure</h2>
+<p>With about three points per breast we get one noisy Water:Fat number, so we can only ask whether the mean is higher in the CANCER breast. A map of around 100 points per breast gives a <strong>distribution</strong> per breast. That supports several readouts (proposal only, not results):</p>
+<ul>
+<li><strong>Wettest region.</strong> A high quantile, or the mean of the wettest N points (not the single maximum), compared left against right.</li>
+<li><strong>Fattiest region as baseline.</strong> Finding 1 says the fattiest 15% look the same across cohorts, so this is a within-patient control, not a discriminator: thickness, calibration and density offsets cancel. Wettest minus fattiest (or their ratio) is a natural per-patient measure.</li>
+<li><strong>Mean Water:Fat</strong> per breast, left against right (paired, so it controls for the patient).</li>
+<li><strong>Variance of Water:Fat</strong> per breast, left against right. Correct for counting noise from neighbour-point differences (about 0.10 on the Ulster map), and report a coefficient of variation or work on the log ratio, because variance scales with the mean. Mask edge and thin points.</li>
+<li><strong>Comparison to a “normal” reference</strong> (mean or variance) is deferred: it needs a healthy-volunteer cohort, and normal varies with density, age and menopausal status.</li>
+</ul>
+<p>A map can separate a <strong>global</strong> effect (the mean shifts), a <strong>local</strong> effect (the wet tail grows) and a <strong>heterogeneity</strong> effect (the variance changes). Single-point scans cannot. It also gives internal controls, several independent readouts, and spatial information on where the wet tissue is, which ties to the tumour sphere-of-influence idea in Chapter 3 (<a href="tumour.html" class="quarto-xref"><span>Chapter 3</span></a>).</p>
+<p>For a small pilot, pre-specify one <strong>primary</strong> endpoint (wettest region, left against right) and treat the rest as secondary or exploratory, to avoid multiple-comparison problems. Points within a breast are spatially correlated, so analyse at breast or patient level, not as 100 independent samples. Prefer comparing whole distributions (for example several quantiles) over relying on a single summary number.</p>
+</section>
+<section id="how-long-would-a-whole-breast-map-take" class="level2" data-number="4.4">
+<h2 data-number="4.4" class="anchored" data-anchor-id="how-long-would-a-whole-breast-map-take"><span class="header-section-number">4.4</span> How long would a whole-breast map take?</h2>
 <p>The practical picture is a <strong>continuous fly-scan</strong>, not a stop-and-dwell grid. The detector runs at <strong>1 Hz</strong>, and the source and detector move together at a preset speed. That speed sets how long the beam spends on each volume of the breast, and so how many photons each 1 s frame collects. Dose and XRD signal-to-noise both follow from that choice.</p>
 <p><strong>Surface scan first (radiation off).</strong> A very rapid initial pass, under 10 s, measures the thickness of the breast at each point with the beam off. That surface map does three jobs:</p>
 <ol type="1">
@@ -441,7 +460,7 @@ Figure&nbsp;4.3: Selecting regions after the scan. <strong>Left</strong>: the sa
 <li><strong>Turn transmission into linear attenuation.</strong> With thickness known, transmission becomes a linear attenuation map — a measure of breast density — at <strong>high spatial resolution</strong>. That transmission map is valuable on its own, and it is also what later marks regions of interest for XRD analysis.</li>
 </ol>
 <p><strong>Then the XRD scan.</strong> Once the region of interest is set from the surface and transmission maps, a scan protocol is designed to keep the time down. Speed can be <strong>dynamic</strong>: slower over thicker tissue so enough photons are collected, faster where the breast is thinner. Neighbouring 1 Hz frames can still be summed afterwards for a cleaner XRD curve at the cost of spatial resolution (<a href="#fig-map-summing" class="quarto-xref">Figure&nbsp;<span>4.2</span></a>); the transmission values keep the fine grid.</p>
-<p>We expect these scans to take <strong>no longer than 5 minutes</strong>. Absolute dose in mGy has not been estimated here and has to be confirmed on the instrument.</p>
+<p>We expect these scans to take <strong>no longer than 5 minutes</strong>. A simulated half breast, stepped at 5 mm only where it is at least 2 cm thick, is 166 such seconds — 2 min 46 s (<a href="simulation.html" class="quarto-xref"><span>Chapter 5</span></a>). Absolute dose in mGy has not been estimated here and has to be confirmed on the instrument.</p>
 <div class="callout callout-style-default callout-note callout-titled">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
@@ -943,8 +962,8 @@ Figure&nbsp;4.3: Selecting regions after the scan. <strong>Left</strong>: the sa
       </a>          
   </div>
   <div class="nav-page nav-page-next">
-      <a href="./limitations.html" class="pagination-link" aria-label="Limitations">
-        <span class="nav-page-text"><span class="chapter-number">5</span>&nbsp; <span class="chapter-title">Limitations</span></span> <i class="bi bi-arrow-right-short"></i>
+      <a href="./simulation.html" class="pagination-link" aria-label="Simulating a Human 2.0 map">
+        <span class="nav-page-text"><span class="chapter-number">5</span>&nbsp; <span class="chapter-title">Simulating a Human 2.0 map</span></span> <i class="bi bi-arrow-right-short"></i>
       </a>
   </div>
 </nav>

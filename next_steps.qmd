@@ -19,4 +19,5 @@ dev_compared = rule_results(WATER_MIN, CENTRE_MIN)["CANCER vs NORMAL"][1]
 3. **Keep the threshold fixed** when new labelled patients are added, rather than retuning it, so the peak at `{python} f"{WATER_MIN:g}"`
    (@sec-limitations) is not carried forward.
 4. **Trial mapping for Human 2.0.** Run the surface-then-XRD fly-scan protocol (1 Hz detector, speed-set collection, dynamic speed on thicker
-   tissue) and check that a whole-breast map finishes within the 5-minute target (@sec-mapping).
+   tissue) and check that a whole-breast map finishes within the 5-minute target (@sec-mapping). A simulated half breast at 5 mm steps, 2 million
+   photons (1 s) at each point 2 cm or thicker, is 166 s: 2 min 46 s (@sec-simulation).

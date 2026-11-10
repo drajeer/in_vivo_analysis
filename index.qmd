@@ -89,7 +89,8 @@ appear wide-reaching in the glandular breast, not confined to the tumour ([Chapt
 [4. Mapping for Human 2.0]{.summary-label} [Proposal]{.summary-badge}
 
 Scan a grid over the whole breast and select the wettest tissue after the scan. The water-peak rule ([Appendix C](the_rule.qmd)) could be a
-stopgap on Human 1.0; mapping is the recommendation ([Chapter 4](mapping.qmd)).
+stopgap on Human 1.0; mapping is the recommendation ([Chapter 4](mapping.qmd)). A simulated half breast at 5 mm steps, one second per point,
+finishes in 2 min 46 s ([Chapter 5](simulation.qmd)).
 :::
 :::
 
@@ -131,5 +132,5 @@ plt.rcParams["font.size"] = 10
 
 ::: {.summary-caveat}
 **A pilot result:** `{python} compared` CANCER/NORMAL patients, 95% CI `{python} f"{interval.low:.0%}–{interval.high:.0%}"`, and mostly dense
-breasts. All limitations are in [Chapter 5](limitations.qmd).
+breasts. All limitations are in [Chapter 6](limitations.qmd).
 :::

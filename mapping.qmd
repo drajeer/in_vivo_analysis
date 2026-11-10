@@ -226,7 +226,8 @@ down. Speed can be **dynamic**: slower over thicker tissue so enough photons are
 frames can still be summed afterwards for a cleaner XRD curve at the cost of spatial resolution (@fig-map-summing); the transmission values keep
 the fine grid.
 
-We expect these scans to take **no longer than 5 minutes**. Absolute dose in mGy has not been estimated here and has to be confirmed on the
+We expect these scans to take **no longer than 5 minutes**. A simulated half breast, stepped at 5 mm only where it is at least 2 cm thick, is
+166 such seconds — 2 min 46 s (@sec-simulation). Absolute dose in mGy has not been estimated here and has to be confirmed on the
 instrument.
 
 ::: {.callout-note title="Mapping is the recommendation for Human 2.0"}

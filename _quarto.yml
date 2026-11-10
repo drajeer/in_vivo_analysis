@@ -10,6 +10,7 @@ book:
     - other_data.qmd
     - tumour.qmd
     - mapping.qmd
+    - simulation.qmd
     - limitations.qmd
     - next_steps.qmd
     - references.qmd

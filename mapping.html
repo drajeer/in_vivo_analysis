@@ -71,7 +71,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="site_libs/quarto-search/fuse.min.js"></script>
 <script src="site_libs/quarto-search/quarto-search.js"></script>
 <meta name="quarto:offset" content="./">
-<link href="./limitations.html" rel="next">
+<link href="./simulation.html" rel="next">
 <link href="./tumour.html" rel="prev">
 <script src="site_libs/quarto-html/quarto.js" type="module"></script>
 <script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
@@ -182,14 +182,20 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </li>
         <li class="sidebar-item">
   <div class="sidebar-item-container"> 
+  <a href="./simulation.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">5</span>&nbsp; <span class="chapter-title">Simulating a Human 2.0 map</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
   <a href="./limitations.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text"><span class="chapter-number">5</span>&nbsp; <span class="chapter-title">Limitations</span></span></a>
+ <span class="menu-text"><span class="chapter-number">6</span>&nbsp; <span class="chapter-title">Limitations</span></span></a>
   </div>
 </li>
         <li class="sidebar-item">
   <div class="sidebar-item-container"> 
   <a href="./next_steps.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text"><span class="chapter-number">6</span>&nbsp; <span class="chapter-title">Next steps</span></span></a>
+ <span class="menu-text"><span class="chapter-number">7</span>&nbsp; <span class="chapter-title">Next steps</span></span></a>
   </div>
 </li>
         <li class="sidebar-item">
@@ -454,7 +460,7 @@ Figure&nbsp;4.3: Selecting regions after the scan. <strong>Left</strong>: the sa
 <li><strong>Turn transmission into linear attenuation.</strong> With thickness known, transmission becomes a linear attenuation map — a measure of breast density — at <strong>high spatial resolution</strong>. That transmission map is valuable on its own, and it is also what later marks regions of interest for XRD analysis.</li>
 </ol>
 <p><strong>Then the XRD scan.</strong> Once the region of interest is set from the surface and transmission maps, a scan protocol is designed to keep the time down. Speed can be <strong>dynamic</strong>: slower over thicker tissue so enough photons are collected, faster where the breast is thinner. Neighbouring 1 Hz frames can still be summed afterwards for a cleaner XRD curve at the cost of spatial resolution (<a href="#fig-map-summing" class="quarto-xref">Figure&nbsp;<span>4.2</span></a>); the transmission values keep the fine grid.</p>
-<p>We expect these scans to take <strong>no longer than 5 minutes</strong>. Absolute dose in mGy has not been estimated here and has to be confirmed on the instrument.</p>
+<p>We expect these scans to take <strong>no longer than 5 minutes</strong>. A simulated half breast, stepped at 5 mm only where it is at least 2 cm thick, is 166 such seconds — 2 min 46 s (<a href="simulation.html" class="quarto-xref"><span>Chapter 5</span></a>). Absolute dose in mGy has not been estimated here and has to be confirmed on the instrument.</p>
 <div class="callout callout-style-default callout-note callout-titled">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
@@ -956,8 +962,8 @@ Figure&nbsp;4.3: Selecting regions after the scan. <strong>Left</strong>: the sa
       </a>          
   </div>
   <div class="nav-page nav-page-next">
-      <a href="./limitations.html" class="pagination-link" aria-label="Limitations">
-        <span class="nav-page-text"><span class="chapter-number">5</span>&nbsp; <span class="chapter-title">Limitations</span></span> <i class="bi bi-arrow-right-short"></i>
+      <a href="./simulation.html" class="pagination-link" aria-label="Simulating a Human 2.0 map">
+        <span class="nav-page-text"><span class="chapter-number">5</span>&nbsp; <span class="chapter-title">Simulating a Human 2.0 map</span></span> <i class="bi bi-arrow-right-short"></i>
       </a>
   </div>
 </nav>

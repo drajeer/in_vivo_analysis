@@ -269,10 +269,10 @@ ul.task-list li input[type="checkbox"] {
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p>The map below is one virtual breast with a <strong>10 mm</strong> tumour. Two million photons is what the real instrument collects in <strong>1 second</strong>, so each step of the map is 1 s of beam time. This breast was stepped at <strong>5 mm</strong>, and only where it is <strong>2 cm or thicker</strong>: <strong>166 steps</strong>, which is <strong>166 seconds (2 min 46 s)</strong>. A <strong>2 cm</strong> tumour, searched the same way, follows the 10 mm maps. The same breast with the tumour removed, and nothing else changed, is at the end.</p>
+<p>The first map is a breast with a <strong>2 cm</strong> tumour. Two million photons is what the real instrument collects in <strong>1 second</strong>, so each step of the map is 1 s of beam time. This breast was stepped at <strong>5 mm</strong>, and only where it is <strong>2 cm or thicker</strong>: <strong>166 steps</strong>, which is <strong>166 seconds (2 min 46 s)</strong>. A dense breast with a <strong>2 cm</strong> tumour follows. The comparison with each breast once the tumour is removed is at the end.</p>
 </div>
 </div>
-<p>The simulator builds a 3D breast from adipose and a branching glandular network, and can add a tumour of any chosen size. The volume used here is a <strong>half breast</strong>: semi-axes 5.5 cm in x and y, height 5.5 cm, voxels of 5 mm, on a 24 × 12 × 12 grid at 0.5 cm (<a href="#fig-sim-phantom" class="quarto-xref">Figure&nbsp;<span>5.1</span></a>). Materials are assigned per voxel (adipose, then glandular). This example adds a <strong>10 mm</strong> tumour (<a href="#fig-sim-tumour" class="quarto-xref">Figure&nbsp;<span>5.2</span></a>).</p>
+<p>The simulator builds a 3D breast from adipose and a branching glandular network, and can add a tumour of any chosen size. The volume used here is a <strong>half breast</strong>: semi-axes 5.5 cm in x and y, height 5.5 cm, voxels of 5 mm, on a 24 × 12 × 12 grid at 0.5 cm (<a href="#fig-sim-phantom" class="quarto-xref">Figure&nbsp;<span>5.1</span></a>). Materials are assigned per voxel (adipose, then glandular).</p>
 <div id="fig-sim-phantom" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-sim-phantom-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
@@ -283,105 +283,155 @@ Figure&nbsp;5.1: The phantom generator. Left: the breast size (5.5 cm semi-axes 
 </figcaption>
 </figure>
 </div>
-<div id="fig-sim-tumour" class="quarto-float quarto-figure quarto-figure-center anchored">
-<figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-sim-tumour-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="images/simulator/Simulated_Tumour.png" class="img-fluid figure-img">
-</div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-sim-tumour-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;5.2: The half breast with a 10 mm tumour. Top: the volume, with the tumour circled. Bottom: one beam slice; the tumour is the green mass, glandular tissue is pink, adipose is brown.
-</figcaption>
-</figure>
-</div>
 <p>A run has two stages. First the photons interact in the breast and are stored. Then they are passed to a detector. The detector and the sample-to-detector distance can be changed after the breast has been simulated, without repeating it. The detector here is the <strong>CdTe Dectris 500K</strong> that Human 2.0 will move to.</p>
-<p><a href="#fig-sim-one-point" class="quarto-xref">Figure&nbsp;<span>5.3</span></a> is one such run, 2 million photons, aimed at a <strong>very fatty</strong> part of this breast. About 16% of the beam is transmitted, and the 1D curve has the fat peak near q = 14 nm⁻¹ and little water, the same shape as the fatty scans in the real data.</p>
+<p><a href="#fig-sim-one-point" class="quarto-xref">Figure&nbsp;<span>5.2</span></a> is one such run, 2 million photons, aimed at a <strong>very fatty</strong> part of this breast. About 16% of the beam is transmitted, and the 1D curve has the fat peak near q = 14 nm⁻¹ and little water, the same shape as the fatty scans in the real data.</p>
 <div id="fig-sim-one-point" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-sim-one-point-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <img src="images/simulator/Dectris_2M_Photons.png" class="img-fluid figure-img">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-sim-one-point-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;5.3: One 2-million-photon run on the CdTe Dectris 500K, after the stored photons have been passed through the detector. The 1D curve is the fatty point used as the example.
+Figure&nbsp;5.2: One 2-million-photon run on the CdTe Dectris 500K, after the stored photons have been passed through the detector. The 1D curve is the fatty point used as the example.
 </figcaption>
 </figure>
 </div>
 <section id="a-map-of-every-thick-point" class="level2" data-number="5.1">
 <h2 data-number="5.1" class="anchored" data-anchor-id="a-map-of-every-thick-point"><span class="header-section-number">5.1</span> A map of every thick point</h2>
 <p>The same 2-million-photon run was repeated on the UCL cluster at every point of this breast that is 2 cm or thicker. That is the scan proposed for Human 2.0 (<a href="mapping.html" class="quarto-xref"><span>Chapter 4</span></a>): leave out the thin edge, and give each remaining point one second. At 5 mm steps that is 166 points, so <strong>2 min 46 s</strong> of beam time, inside the 5-minute limit.</p>
-<p>Each simulated point was then prepared exactly as a real scan: the fat peak was shifted to q = 14 nm⁻¹, and the curve was normalised the same way. A 2 × 2 kernel, four neighbouring points, was slid over every position on the breast. The search keeps the position with the highest Water:Fat automatically. <a href="#fig-sim-kernel" class="quarto-xref">Figure&nbsp;<span>5.4</span></a> is the kernel it found. Its Water:Fat is <strong>0.245</strong>, at pixels (9, 6), (9, 7), (10, 6) and (10, 7). The red curve is those four points summed, and it rises through the water band where the global mean stays low. The red box on the maps below is this kernel.</p>
-<div id="fig-sim-kernel" class="quarto-float quarto-figure quarto-figure-center anchored">
-<figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-sim-kernel-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="images/simulator/Higghest_water_Kernel.png" class="img-fluid figure-img">
-</div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-sim-kernel-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;5.4: The wettest 2 × 2 kernel, found automatically, on the breast with the 10 mm tumour. Left: Water:Fat of every 2 × 2 position (137 of them); the search outlines the wettest. Right: the summed curve of that kernel (red) against the global mean (dashed). Water:Fat of the kernel is 0.245.
-</figcaption>
-</figure>
-</div>
-<p>Thickness is known from the phantom and transmission from the run, so the linear attenuation is μ = −ln(T) / thickness (<a href="#fig-sim-mu" class="quarto-xref">Figure&nbsp;<span>5.5</span></a>). The red box is the kernel in <a href="#fig-sim-kernel" class="quarto-xref">Figure&nbsp;<span>5.4</span></a>.</p>
-<div id="fig-sim-mu" class="quarto-float quarto-figure quarto-figure-center anchored">
-<figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-sim-mu-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="images/simulator/Linear_Attenuation_1cm_Tumour.png" class="img-fluid figure-img">
-</div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-sim-mu-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;5.5: Linear attenuation of the breast with the 10 mm tumour, from transmission and thickness. The red box is the wettest 2 × 2 kernel from <a href="#fig-sim-kernel" class="quarto-xref">Figure&nbsp;<span>5.4</span></a>, Water:Fat 0.245.
-</figcaption>
-</figure>
-</div>
-<p>The same two-Gaussian Water:Fat used on the real scans (<a href="water_fat.html" class="quarto-xref"><span>Appendix B</span></a>) gives a ratio at each point (<a href="#fig-sim-wf-tumour" class="quarto-xref">Figure&nbsp;<span>5.6</span></a>). Most of the breast stays low. The tumour is the exception: the red box is the kernel in <a href="#fig-sim-kernel" class="quarto-xref">Figure&nbsp;<span>5.4</span></a>, Water:Fat <strong>0.245</strong>, and it sits on the tumour. That contrast, the tumour against the fatty tissue around it, is why the map marks this patch and not the glandular tissue.</p>
-<div id="fig-sim-wf-tumour" class="quarto-float quarto-figure quarto-figure-center anchored">
-<figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-sim-wf-tumour-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="images/simulator/Water_Fat_Ratio_1cm_Tumour.png" class="img-fluid figure-img">
-</div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-sim-wf-tumour-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;5.6: Water:Fat at each point of the breast with the 10 mm tumour, from the water and fat Gaussian areas (±2σ). The red box is the wettest 2 × 2 kernel, Water:Fat 0.245, on the tumour.
-</figcaption>
-</figure>
-</div>
-</section>
-<section id="a-2-cm-tumour" class="level2" data-number="5.2">
-<h2 data-number="5.2" class="anchored" data-anchor-id="a-2-cm-tumour"><span class="header-section-number">5.2</span> A 2 cm tumour</h2>
-<p><a href="#fig-sim-tumour-2cm" class="quarto-xref">Figure&nbsp;<span>5.7</span></a> is a breast with a <strong>2 cm</strong> tumour: the green mass in the slice. The same automatic search keeps a wetter kernel (<a href="#fig-sim-kernel-2cm" class="quarto-xref">Figure&nbsp;<span>5.8</span></a>). Its Water:Fat is <strong>0.279</strong>, at pixels (11, 4), (11, 5), (12, 4) and (12, 5). The red curve rises further through the water band than the 10 mm kernel (<a href="#fig-sim-kernel" class="quarto-xref">Figure&nbsp;<span>5.4</span></a>).</p>
+<p>This map is a breast with a <strong>2 cm</strong> tumour (<a href="#fig-sim-tumour-2cm" class="quarto-xref">Figure&nbsp;<span>5.3</span></a>). Each simulated point was prepared exactly as a real scan: the fat peak was shifted to q = 14 nm⁻¹, and the curve was normalised the same way. Thickness and transmission give the linear attenuation, μ = −ln(T) / thickness. A 3 × 3 kernel, nine neighbouring points, was slid over every position, and the search keeps the highest Water:Fat automatically.</p>
+<p><a href="#fig-sim-maps" class="quarto-xref">Figure&nbsp;<span>5.4</span></a> puts the two readings of this breast side by side. On the left, linear attenuation behaves like a mammogram: glandular tissue and the tumour are both dense, so both are bright. On the right, the 3 × 3 kernel map stays low over the rest of the breast, and the red box is the kernel the search kept. It sits on the tumour.</p>
 <div id="fig-sim-tumour-2cm" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-sim-tumour-2cm-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <img src="images/simulator/2cm_tumour_volume.png" class="img-fluid figure-img">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-sim-tumour-2cm-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;5.7: A breast with a 2 cm tumour. Top: the volume, with the tumour circled. Bottom: one beam slice; the tumour is the green mass, glandular tissue is pink, adipose is brown.
+Figure&nbsp;5.3: A breast with a 2 cm tumour. Top: the volume, with the tumour circled. Bottom: one beam slice; the tumour is the green mass, glandular tissue is pink, adipose is brown.
 </figcaption>
 </figure>
 </div>
-<div id="fig-sim-kernel-2cm" class="quarto-float quarto-figure quarto-figure-center anchored">
+<div id="fig-sim-maps" class="quarto-layout-panel">
 <figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-sim-kernel-2cm-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="images/simulator/Water_Fat_Ratio_map_2cm_Tumrou.png" class="img-fluid figure-img">
+<div aria-describedby="fig-sim-maps-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="quarto-layout-row">
+<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="images/simulator/Linear_Attenuation_compare.png" class="img-fluid figure-img"></p>
+<figcaption>Linear attenuation, μ = −ln(T) / thickness.</figcaption>
+</figure>
 </div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-sim-kernel-2cm-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;5.8: The wettest 2 × 2 kernel, found automatically, on a breast with a 2 cm tumour. Left: Water:Fat of every 2 × 2 position (137 of them); the search outlines the wettest. Right: the summed curve of that kernel (red) against the global mean (dashed). Water:Fat of the kernel is 0.279.
+</div>
+<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="images/simulator/Kernel_3x3_2cm.png" class="img-fluid figure-img"></p>
+<figcaption>Water:Fat of every 3 × 3 kernel (110 positions). The red box is the wettest.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-sim-maps-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;5.4: Linear attenuation and the 3 × 3 kernel map of the breast with the 2 cm tumour. Left: dense tissue, glandular and tumour together, as on a mammogram. Right: the kernel the search kept, outlined, on the tumour.
 </figcaption>
 </figure>
 </div>
 </section>
-<section id="the-same-breast-with-no-tumour" class="level2" data-number="5.3">
-<h2 data-number="5.3" class="anchored" data-anchor-id="the-same-breast-with-no-tumour"><span class="header-section-number">5.3</span> The same breast, with no tumour</h2>
-<p><a href="#fig-sim-wf" class="quarto-xref">Figure&nbsp;<span>5.9</span></a> is the same breast with the tumour removed and nothing else changed. There is no patch that stands out. The same automatic search now keeps a kernel of Water:Fat <strong>0.203</strong>, at pixels (13, 0), (13, 1), (14, 0) and (14, 1), the red box, and it sits on glandular tissue. A water peak does not stand out, so this breast would fall on the fatty side of the top 15% cut (<a href="water_rich.html" class="quarto-xref"><span>Chapter 1</span></a>) and of the water-peak rule at 0.35 (<a href="the_rule.html" class="quarto-xref"><span>Appendix C</span></a>, <a href="usable_patients.html#fig-missed-normal-normal" class="quarto-xref">Figure&nbsp;<span>F.5</span></a>). The 10 mm tumour is marked because its wettest kernel is <strong>0.245</strong> against <strong>0.203</strong>, and that kernel is the tumour. With a 2 cm tumour the same search keeps <strong>0.279</strong> (<a href="#fig-sim-kernel-2cm" class="quarto-xref">Figure&nbsp;<span>5.8</span></a>).</p>
-<p>All 166 points were kept. The global mean of the 166 curves has Water:Fat <strong>0.115</strong>. Point by point the ratio is <strong>0.096 ± 0.054</strong> (median 0.088). The wettest 15% has Water:Fat <strong>0.202</strong> on its mean curve; the fattiest 15% has <strong>0.047</strong>. That is the same kind of summary proposed for a real map (<a href="mapping.html#sec-map-measures" class="quarto-xref"><span>Section 4.3</span></a>).</p>
-<div id="fig-sim-wf" class="quarto-float quarto-figure quarto-figure-center anchored">
+<section id="a-dense-breast-with-a-2-cm-tumour" class="level2" data-number="5.2">
+<h2 data-number="5.2" class="anchored" data-anchor-id="a-dense-breast-with-a-2-cm-tumour"><span class="header-section-number">5.2</span> A dense breast, with a 2 cm tumour</h2>
+<p><a href="#fig-sim-dense" class="quarto-xref">Figure&nbsp;<span>5.5</span></a> is a dense breast: glandular tissue fills much more of the slice, and a <strong>2 cm</strong> tumour sits in it. <a href="#fig-sim-maps-dense" class="quarto-xref">Figure&nbsp;<span>5.6</span></a> is the same pair of readings as <a href="#fig-sim-maps" class="quarto-xref">Figure&nbsp;<span>5.4</span></a>. With more glandular tissue, linear attenuation shows one broad dense region, so the tumour is harder to separate from the tissue around it. The 3 × 3 search still outlines it. The red box is that kernel, Water:Fat <strong>0.337</strong>, on the tumour.</p>
+<div id="fig-sim-dense" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-sim-wf-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="images/simulator/Water_Fat_Ratio_map.png" class="img-fluid figure-img">
+<div aria-describedby="fig-sim-dense-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="images/simulator/Dense_Breast_Sim.png" class="img-fluid figure-img">
 </div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-sim-wf-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;5.9: Water:Fat at each point of the same breast with no tumour, from the water and fat Gaussian areas (±2σ). The red box is the wettest 2 × 2 kernel, Water:Fat 0.203.
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-sim-dense-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;5.5: A dense breast with a 2 cm tumour. Top: the volume, with the tumour circled. Bottom: one beam slice; the tumour is the green mass, glandular tissue is pink, adipose is brown.
+</figcaption>
+</figure>
+</div>
+<div id="fig-sim-maps-dense" class="quarto-layout-panel">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-sim-maps-dense-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="quarto-layout-row">
+<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="images/simulator/Linear_Attenuation_dense.png" class="img-fluid figure-img"></p>
+<figcaption>Linear attenuation, μ = −ln(T) / thickness.</figcaption>
+</figure>
+</div>
+</div>
+<div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="images/simulator/Kernel_3x3_dense.png" class="img-fluid figure-img"></p>
+<figcaption>Water:Fat from the peak heights. The red box is the wettest 3 × 3 kernel.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-sim-maps-dense-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;5.6: Linear attenuation and the 3 × 3 kernel map of the dense breast with a 2 cm tumour. Left: glandular tissue and the tumour form one dense region. Right: the kernel the search kept, Water:Fat 0.337, on the tumour.
+</figcaption>
+</figure>
+</div>
+</section>
+<section id="compared-with-no-tumour" class="level2" data-number="5.3">
+<h2 data-number="5.3" class="anchored" data-anchor-id="compared-with-no-tumour"><span class="header-section-number">5.3</span> Compared with no tumour</h2>
+<p>The same 3 × 3 search, on the same breast with the tumour removed and nothing else changed. With a tumour the summed curve rises through the water band. Without one it stays with the global mean, and the breast would fall on the fatty side of the top 15% cut (<a href="water_rich.html" class="quarto-xref"><span>Chapter 1</span></a>) and of the water-peak rule at 0.35 (<a href="the_rule.html" class="quarto-xref"><span>Appendix C</span></a>, <a href="usable_patients.html#fig-missed-normal-normal" class="quarto-xref">Figure&nbsp;<span>F.5</span></a>).</p>
+<section id="the-less-dense-breast" class="level3" data-number="5.3.1">
+<h3 data-number="5.3.1" class="anchored" data-anchor-id="the-less-dense-breast"><span class="header-section-number">5.3.1</span> The less dense breast</h3>
+<p><a href="#fig-sim-kernel-2cm" class="quarto-xref">Figure&nbsp;<span>5.7</span></a> is the less dense breast with the 2 cm tumour. The kernel the search keeps has Water:Fat <strong>0.292</strong>. <a href="#fig-sim-kernel-2cm-none" class="quarto-xref">Figure&nbsp;<span>5.8</span></a> is that breast with the tumour removed. The wettest kernel is then <strong>0.176</strong>, and the red curve lies on the global mean through the water band.</p>
+<div id="fig-sim-kernel-2cm" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-sim-kernel-2cm-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="images/simulator/Kernel_3x3_curve_2cm.png" class="img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-sim-kernel-2cm-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;5.7: The wettest 3 × 3 kernel on the less dense breast with a 2 cm tumour. Left: Water:Fat of every 3 × 3 position (110 of them); the search outlines the wettest. Right: the summed curve (red) against the global mean (dashed). Water:Fat of the kernel is 0.292.
+</figcaption>
+</figure>
+</div>
+<div id="fig-sim-kernel-2cm-none" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-sim-kernel-2cm-none-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="images/simulator/Kernel_3x3_curve_2cm_none.png" class="img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-sim-kernel-2cm-none-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;5.8: The wettest 3 × 3 kernel on the less dense breast with no tumour. Left: Water:Fat of every 3 × 3 position (110 of them); the search outlines the wettest. Right: the summed curve (red) against the global mean (dashed). Water:Fat of the kernel is 0.176.
+</figcaption>
+</figure>
+</div>
+</section>
+<section id="the-dense-breast" class="level3" data-number="5.3.2">
+<h3 data-number="5.3.2" class="anchored" data-anchor-id="the-dense-breast"><span class="header-section-number">5.3.2</span> The dense breast</h3>
+<p><a href="#fig-sim-kernel-dense" class="quarto-xref">Figure&nbsp;<span>5.9</span></a> is the dense breast with the 2 cm tumour. The kernel the search keeps has Water:Fat <strong>0.337</strong>. <a href="#fig-sim-kernel-dense-none" class="quarto-xref">Figure&nbsp;<span>5.10</span></a> is that breast with the tumour removed. The wettest kernel is then <strong>0.192</strong>, and the red curve stays with the global mean.</p>
+<div id="fig-sim-kernel-dense" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-sim-kernel-dense-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="images/simulator/Kernel_3x3_curve_dense.png" class="img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-sim-kernel-dense-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;5.9: The wettest 3 × 3 kernel on the dense breast with a 2 cm tumour. Left: Water:Fat of every 3 × 3 position (110 of them); the search outlines the wettest. Right: the summed curve (red) against the global mean (dashed). Water:Fat of the kernel is 0.337.
+</figcaption>
+</figure>
+</div>
+<div id="fig-sim-kernel-dense-none" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-sim-kernel-dense-none-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="images/simulator/Kernel_3x3_curve_dense_none.png" class="img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-sim-kernel-dense-none-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;5.10: The wettest 3 × 3 kernel on the dense breast with no tumour. Left: Water:Fat of every 3 × 3 position (110 of them); the search outlines the wettest. Right: the summed curve (red) against the global mean (dashed). Water:Fat of the kernel is 0.192.
 </figcaption>
 </figure>
 </div>
 
 
+</section>
 </section>
 
 </main> <!-- /main -->
